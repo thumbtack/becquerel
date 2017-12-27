@@ -1,0 +1,25 @@
+# Apple
+._*
+.DS_Store
+
+# IntelliJ
+/.idea
+/*.iml
+
+# sbt
+.cache
+.history
+.lib/
+target/
+project/project
+project/target
+
+# Local configuration
+conf/application.conf
+conf/demo.conf
+conf/logback.xml
+*credentials*.json
+*secret*.json
+
+# Test data from external sources
+test_data/ds2/

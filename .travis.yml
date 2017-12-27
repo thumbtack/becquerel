@@ -1,0 +1,58 @@
+dist: trusty
+sudo: false
+
+language: scala
+scala: "2.11.8"
+
+# See https://www.scala-sbt.org/0.13/docs/Travis-CI-with-sbt.html#Caching
+cache:
+  directories:
+    - '$HOME/.ivy2/cache'
+    - '$HOME/.sbt'
+before_cache:
+  - 'find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete'
+  - 'find $HOME/.sbt        -name "*.lock"               -print -delete'
+
+services:
+  - postgresql
+  - elasticsearch
+
+before_script:
+  # Create integration test config by removing bq, shadow, and metrics sections from example config.
+  - "sed '/^  bq {/,/^  }/d; /^  shadow {/,/^  }/d; /^metrics {/,/^}/d' conf/application-example.conf > conf/application.conf"
+  - "sed '/^  bq {/,/^  }/d' conf/demo-example.conf > conf/demo.conf"
+  - 'cp conf/logback-example.xml conf/logback.xml'
+
+  # Download test data.
+  - "sh -c 'cd test_data && ./ds2_download.sh'"
+
+  # Load test data into ES and PG (not testing against BQ for now).
+  - "sbt ++$TRAVIS_SCALA_VERSION 'runMain com.thumbtack.becquerel.demo.EsDemoLoader' && export ES_TESTS=true"
+  - "sbt ++$TRAVIS_SCALA_VERSION 'runMain com.thumbtack.becquerel.demo.PgDemoLoader' && export PG_TESTS=true"
+
+  # Enable integration tests.
+  - 'export INTEGRATION_TESTS=true'
+
+script:
+  - 'sbt ++$TRAVIS_SCALA_VERSION coverage test coverageReport'
+
+after_success:
+  - 'bash <(curl -s https://codecov.io/bash)'
+
+before_deploy:
+  # Remove integration test config.
+  - 'rm conf/application.conf conf/demo.conf conf/logback.xml'
+
+  # Create release artifacts.
+  - 'sbt ++$TRAVIS_SCALA_VERSION universal:packageBin universal:packageZipTarball universal:packageXzTarball'
+
+deploy:
+  provider: releases
+  api_key:
+    secure: lBCHJ/drKxWVRWFYS+tbpZY91MALI80/2hQsTy3PQtUkUFtZCFcCDzdfTm+ZgxK3arp70g6+tef5uuZ+ADaHLkPKTHA5xxfem1QqzDuITdsRMGZGUMduh7diU/gEZ3TBGBro5B01lrpezyHHVL3N4htsBBmEa1aBxSZGh+1t9AWkaC76BqPhBl5x9jx+yOVqDt/DukBey85P9yNh4ZSicr8GxODvfqQdGTfDj57eDqmzXpFxrCA7+6LOYmPaDakV+XNDGxzTOpgWTS1PEtWUM2Mg2wHFoIOwdk2bysmZaqGqpDJ2Bbqr9fJyrZaQSTrgU8CyX6+vnBwrVwd1ict7UwtKDFOYzY6xuGvLpdbXerD52wDU3nzup3jIVe6FMCvGYL+4RNkSIu9CqcNxW6LGSrQbKqN+E3xxQRCs6P56JPMNWOt51Mp5HyzsCcwMy+WdwNHl214qaOKMQAkk1KaRqWfOvyZ6edOi2U2fN226GHxybdSEz9rJhilWzYdz61fIaaAV/VRvECn9gY5mhgOtC3XGP62o2/E0DpnxQcn/VdjQ0LPPuEeUH2oCxXjaDQSCdJsiqvkXkus4f+2qmrNGy+Q2QFxxWIsF1DnK44Gbkv1KGQhPt7mXqKAkLliyrDdH+Wb+X98cwpfLjXOwrUWgWXPuWMjnWNaLK3A+s60PKZ0=
+  skip_cleanup: true
+  file_glob: true
+  file: 'target/universal/becquerel-*'
+  on:
+    repo: thumbtack/becquerel
+    tags: true

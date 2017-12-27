@@ -1,0 +1,56 @@
+/*
+ *    Copyright 2017 Thumbtack
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package com.thumbtack.becquerel.datasources.bigquery.mocks
+
+import java.lang.reflect.Constructor
+
+import com.google.cloud.bigquery._
+
+/**
+  * [[Table]] doesn't have a public constructor. Fake it.
+  */
+object MockTable {
+  val builderCtor: Constructor[Table.Builder] = classOf[Table.Builder].getDeclaredConstructor(
+    classOf[BigQuery], classOf[TableId], classOf[TableDefinition]
+  )
+  builderCtor.setAccessible(true)
+
+  def apply(
+    bigQuery: BigQuery,
+    tableId: TableId,
+    tableDefinition: TableDefinition
+  ): Table = {
+    builderCtor.newInstance(bigQuery, tableId, tableDefinition).build()
+  }
+
+  /**
+    * Creates a minimal definition with no schema, just the table type.
+    * This is what you'd get from a `listTables` call.
+    */
+  def apply(
+    bigQuery: BigQuery,
+    tableId: TableId,
+    tableType: TableDefinition.Type
+  ): Table = {
+    //noinspection NotImplementedCode
+    val tableDefinition = tableType match {
+      case TableDefinition.Type.TABLE => StandardTableDefinition.newBuilder().build()
+      case _ => ??? // Views and external tables not mocked yet.
+    }
+    builderCtor.newInstance(bigQuery, tableId, tableDefinition).build()
+  }
+}

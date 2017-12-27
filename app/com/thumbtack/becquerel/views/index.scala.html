@@ -1,0 +1,29 @@
+@(env: scala.collection.Map[String, scala.collection.Map[String, String]])
+@import com.thumbtack.becquerel.views.html.main
+
+@main("Becquerel status") {
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for(section <- env) {
+                <tr>
+                    <th>@section._1</th>
+                    <th><hr></th>
+                </tr>
+                @for(kv <- section._2) {
+                    <tr>
+                        <td>@kv._1</td>
+                        <td>@kv._2</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+}

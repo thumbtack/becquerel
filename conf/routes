@@ -1,0 +1,10 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+# Home page
+GET     /                           com.thumbtack.becquerel.controllers.HomeController.index
+GET     /assets/*file               controllers.Assets.at(path="/public", file)
+GET     /metrics                    com.kenshoo.play.metrics.MetricsController.metrics
+GET     /:name/                     com.thumbtack.becquerel.controllers.HomeController.odataService(name, path="/")
+GET     /:name/*path                com.thumbtack.becquerel.controllers.HomeController.odataService(name, path)

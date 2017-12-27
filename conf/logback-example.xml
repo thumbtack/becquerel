@@ -1,0 +1,34 @@
+<configuration>
+
+    <!-- Write logs to stderr. -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- You should use only one of the encoders below. -->
+
+        <!-- Plain text encoder with run ID if available. Good for human-readable console output. -->
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %level %logger %X{run_id} - %message%n%xException</pattern>
+        </encoder>
+
+        <!-- Logstash-compatible JSON encoder. Captures lots of detail. Good for log forwarding systems. -->
+        <!--
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+        -->
+    </appender>
+
+    <!-- Do logging asynchronously. -->
+    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="STDOUT" />
+    </appender>
+
+    <!-- Show informational messages from Play. -->
+    <logger name="play" level="INFO" />
+
+    <!-- Show info messages from Becquerel itself. You may want to show more during development or troubleshooting. -->
+    <logger name="com.thumbtack.becquerel" level="INFO" />
+
+    <!-- Show only warning messages from all other code. -->
+    <root level="WARN">
+        <appender-ref ref="ASYNCSTDOUT" />
+    </root>
+
+</configuration>

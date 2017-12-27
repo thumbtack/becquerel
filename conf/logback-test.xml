@@ -1,0 +1,4 @@
+<!-- Disables logging during tests. -->
+<configuration>
+    <root level="OFF"/>
+</configuration>

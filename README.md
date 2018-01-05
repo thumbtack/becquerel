@@ -7,8 +7,8 @@ Becquerel is a gateway server that provides an [OData 4.0](http://www.odata.org/
 [![license](https://img.shields.io/github/license/thumbtack/becquerel.svg)](LICENSE.txt)
 [![Travis](https://img.shields.io/travis/thumbtack/becquerel.svg)](https://travis-ci.org/thumbtack/becquerel)
 [![Codecov](https://img.shields.io/codecov/c/github/thumbtack/becquerel.svg)](https://codecov.io/gh/thumbtack/becquerel)
-[![GitHub release](https://img.shields.io/github/release/thumbtack/becquerel.svg)](releases)
-[![Github All Releases](https://img.shields.io/github/downloads/thumbtack/becquerel/total.svg)](releases)
+[![GitHub release](https://img.shields.io/github/release/thumbtack/becquerel.svg)](https://github.com/thumbtack/becquerel/releases)
+[![Github All Releases](https://img.shields.io/github/downloads/thumbtack/becquerel/total.svg)](https://github.com/thumbtack/becquerel/releases)
 
 # Table of contents
 
@@ -147,7 +147,7 @@ See the [Salesforce setup instructions](docs/salesforce/salesforce.md). They ass
   
 # Getting involved
 
-We welcome feedback in the [GitHub issue tracker](issues), as well as pull requests!
+We welcome feedback in the [GitHub issue tracker](https://github.com/thumbtack/becquerel/issues), as well as pull requests!
 
 # Supported data sources
 
@@ -274,3 +274,19 @@ At the time of evaluation, it did not connect to BQ natively, or work with Elast
 Finally, WSO2 DSS is rather difficult to configure or modify. Their preferred scenario involves a custom Eclipse fork and an XML DSL. Becquerel is only about six thousand lines of Scala code.
 
 WSO2 DSS might be a good option if you only need to talk to conventional SQL databases with conservative schemas and available JDBC drivers.
+
+# Maintainer info
+
+## Docs
+
+If you add new sections to a Markdown document, run [`gh-md-toc`](https://github.com/ekalinin/github-markdown-toc.go) on that document, drop the headers and footers, and copy the generated TOC into the document manually. `gh-md-toc README.md | grep -v gh-md-toc | tail -n +5 | sed '/^$/d'` will do most of this for you.
+
+## Releases
+
+Becquerel follows [SemVer](https://semver.org/) and uses [sbt-release](https://github.com/sbt/sbt-release). Run `sbt release` to make and push a release tag, and set the next version. Travis CI is configured to build new GitHub binary releases from tags automatically.
+
+If there's something wrong with a release, follow these steps, in this order:
+
+- Delete the release tag for that version, locally and [on GitHub](https://www.abeautifulsite.net/how-to-delete-a-tag-on-github).
+- Delete all binaries attached to that release on GitHub, then [delete the release itself](https://help.github.com/articles/editing-and-deleting-releases/).
+- Run `sbt release`, but specify the version as the one you just deleted as the current version.

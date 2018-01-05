@@ -53,7 +53,7 @@ Becquerel is a gateway server that provides an [OData 4.0](http://www.odata.org/
 
 # Getting started
 
-If you're not customizing it and just want to use it, download a prebuilt Becquerel release from our [GitHub Releases section](releases) and read the subsections below on [configuring](#configuring-becquerel), [deploying](#deploying-becquerel), and [connecting to Salesforce](#connecting-to-salesforce). For full development info, read all of this section.
+If you're not customizing it and just want to use it, download a prebuilt Becquerel release from our [GitHub Releases section](https://github.com/thumbtack/becquerel/releases) and read the subsections below on [configuring](#configuring-becquerel), [deploying](#deploying-becquerel), and [connecting to Salesforce](#connecting-to-salesforce). For full development info, read all of this section.
 
 ## Configuring Becquerel
 

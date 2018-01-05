@@ -47,6 +47,9 @@ Becquerel is a gateway server that provides an [OData 4.0](http://www.odata.org/
   * [Limitations](#limitations)
   * [Alternatives](#alternatives)
     * [WSO2 DSS](#wso2-dss)
+  * [Maintainer info](#maintainer-info)
+    * [Docs](#docs)
+    * [Releases](#releases)
 
 # Getting started
 

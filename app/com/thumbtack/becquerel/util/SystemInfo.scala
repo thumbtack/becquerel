@@ -18,14 +18,19 @@ package com.thumbtack.becquerel.util
 
 import javax.inject.{Inject, Singleton}
 
-import scala.collection.JavaConverters._
-import scala.collection.mutable
-import com.twitter.util.StorageUnit
+import com.typesafe.config.ConfigException.WrongType
 import play.api.inject.Modules
 import play.api.{Configuration, Environment}
 
+import com.twitter.util.StorageUnit
+
 import com.thumbtack.becquerel.BuildInfo
 import com.thumbtack.becquerel.util.Glob._
+
+import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.util.control.NonFatal
+import scala.util.matching.Regex
 
 /**
   * Show system status and configuration.
@@ -78,9 +83,20 @@ class SystemInfo @Inject() (
     * Don't show passwords and API keys in their entirety.
     */
   protected def censor(varType: String, name: String, value: String): String = {
-    val shouldCensor = configuration
-      .getString(s"censor.$varType")
-      .exists(Glob.compile(_).matches(name))
+    // Previous versions supported a single glob pattern; now we support lists as well.
+    val censorGlobsPath = s"censor.$varType"
+    val censorMatcher: Option[Regex] = try {
+      configuration
+        .getStringSeq(censorGlobsPath)
+        .map(Glob.compile)
+    } catch {
+      case NonFatal(e) if e.getCause.isInstanceOf[WrongType] =>
+        configuration
+          .getString(censorGlobsPath)
+          .map(Glob.compile)
+    }
+
+    val shouldCensor = censorMatcher.exists(_.matches(name))
     if (shouldCensor) {
       value.substring(0, 4) + "…"
     } else {

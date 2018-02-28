@@ -65,7 +65,7 @@ libraryDependencies ++= Seq(
   // Provides a SQL AST and writer.
   "org.apache.calcite" % "calcite-core" % "1.12.0",
   // Log JSON.
-  "net.logstash.logback" % "logstash-logback-encoder" % "4.8",
+  "net.logstash.logback" % "logstash-logback-encoder" % "4.11",
   // Format byte counts on debug page.
   "com.twitter" %% "util-core" % "6.42.0",
   // Play filter for DropWizard metrics library.

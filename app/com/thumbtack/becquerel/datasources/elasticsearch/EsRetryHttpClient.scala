@@ -16,11 +16,12 @@
 
 package com.thumbtack.becquerel.datasources.elasticsearch
 
+import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
-import akka.actor.Scheduler
+import akka.actor.{Cancellable, Scheduler}
 import com.sksamuel.elastic4s.http.{HttpClient, HttpExecutable}
 import org.elasticsearch.client.{ResponseException, RestClient}
 
@@ -47,7 +48,20 @@ class EsRetryHttpClient(
 
   override def rest: RestClient = wrapped.rest
 
-  override def close(): Unit = wrapped.close()
+  /**
+    * Keep track of pending retries so we can cancel them on graceful exit with [[close]]
+    * (`Scheduler.close` is required to execute all of them if it implements `close` at all).
+    */
+  protected val pendingTasks: mutable.Set[Cancellable] = mutable.Set.empty
+
+  def numPendingTasks: Int = pendingTasks.size // Intentionally not synchronized since it's just a metric.
+
+  override def close(): Unit = {
+    pendingTasks.synchronized {
+      pendingTasks.foreach(_.cancel())
+    }
+    wrapped.close()
+  }
 
   override def execute[T, U](request: T)(implicit exec: HttpExecutable[T, U]): Future[U] = {
     safeExecute(request)
@@ -87,12 +101,18 @@ class EsRetryHttpClient(
       logger.warn(s"Retrying rate-limited Elasticsearch request in $wait (attempt $attempts of $maxAttempts)")
 
       val promise = Promise[U]()
-      scheduler.scheduleOnce(wait) {
+      val task: Cancellable = scheduler.scheduleOnce(wait) {
         promise.completeWith(
           safeExecute(request)
             .recoverWith(retry(request, attempts + 1))
         )
       }
+      pendingTasks.synchronized {
+        pendingTasks += task
+      }
+      promise.future.onComplete(_ => pendingTasks.synchronized {
+        pendingTasks -= task
+      })
       promise.future
   }
 }

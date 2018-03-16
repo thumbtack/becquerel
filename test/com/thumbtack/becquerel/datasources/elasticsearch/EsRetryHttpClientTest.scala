@@ -192,15 +192,25 @@ class MockHttpAsyncClient(succeedAfter: Int) extends CloseableHttpAsyncClient {
 /**
   * Mock Akka scheduler that runs everything immediately, but keeps track of how long it would have waited.
   */
+//noinspection NotImplementedCode
 class MockScheduler extends Scheduler {
-  override def schedule(initialDelay: FiniteDuration, interval: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = null
-  override def maxFrequency: Double = 1.0
+  override def schedule(initialDelay: FiniteDuration, interval: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = ???
+  override def maxFrequency: Double = ???
 
   val delays: mutable.Buffer[Duration] = mutable.Buffer.empty[Duration]
 
   override def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = {
     delays += delay
     runnable.run()
-    null
+    new Cancellable {
+      private var cancelled = false
+
+      override def cancel(): Boolean = {
+        cancelled = true
+        true
+      }
+
+      override def isCancelled: Boolean = cancelled
+    }
   }
 }

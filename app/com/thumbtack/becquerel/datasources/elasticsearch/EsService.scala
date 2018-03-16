@@ -23,6 +23,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
+import com.codahale.metrics.{Gauge, MetricRegistry}
 import com.sksamuel.elastic4s.Hit
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.HttpClient
@@ -53,6 +54,12 @@ class EsService(
     val section = mutable.LinkedHashMap.empty[String, String]
     section ++= super.describe
     section("URL") = esConfig.url
+    section("Indexes") = esConfig.indexes.toSeq.sorted.mkString(", ")
+    section("Aliases") = esConfig.indexes.toSeq.sorted.mkString(", ")
+    section("Retry initial wait") = esConfig.retryInitialWait.toString
+    section("Retry max attempts") = esConfig.retryMaxAttempts.toString
+    section("Retry status codes") = esConfig.retryStatusCodes.toSeq.sorted.mkString(", ")
+    section("Pending retries") = pendingRetries.getValue.toString
     section
   }
 
@@ -61,19 +68,36 @@ class EsService(
     */
   protected val actualEsClient: HttpClient = HttpClient(esConfig.url)
 
+  protected val metadataEsClient: EsRetryHttpClient = new EsRetryHttpClient(
+    actualEsClient,
+    actorSystem.scheduler,
+    initialWait = esConfig.retryInitialWait,
+    maxAttempts = esConfig.retryMaxAttempts,
+    statusCodes = esConfig.retryStatusCodes
+  )(metadataEC)
+
+  protected val queryEsClient: EsRetryHttpClient = new EsRetryHttpClient(
+    actualEsClient,
+    actorSystem.scheduler,
+    initialWait = esConfig.retryInitialWait,
+    maxAttempts = esConfig.retryMaxAttempts,
+    statusCodes = esConfig.retryStatusCodes
+  )(queryEC)
+
+  protected val pendingRetries: Gauge[Int] = metrics.defaultRegistry.register(
+    MetricRegistry.name("service", name, "pendingRetries"),
+    new Gauge[Int] {
+      override def getValue: Int = {
+        metadataEsClient.numPendingTasks + queryEsClient.numPendingTasks
+      }
+    })
+
   protected override def fetchDefinitions(): Future[Seq[IndexMappings]] = {
     implicit val ec: ExecutionContext = metadataEC
-    val esClient = new EsRetryHttpClient(
-      actualEsClient,
-      actorSystem.scheduler,
-      initialWait = esConfig.retryInitialWait,
-      maxAttempts = esConfig.retryMaxAttempts,
-      statusCodes = esConfig.retryStatusCodes
-    )
 
     // Fetch the mappings for every index that matches the `indexes` glob.
     val indexMappingsTask: Future[Seq[IndexMappings]] = Future.traverse(esConfig.indexes.toSeq) { glob =>
-      esClient.execute {
+      metadataEsClient.execute {
         // Note: indexes that have disabled mappings with no properties will cause
         // a `java.util.NoSuchElementException` in `GetMappingHttpExecutable`.
         // See https://www.elastic.co/guide/en/elasticsearch/reference/current/enabled.html
@@ -84,7 +108,7 @@ class EsService(
 
     // Fetch the mappings for every alias that matches an `aliases` glob.
     val aliasMappingsTask: Future[Seq[IndexMappings]] = Future.traverse(esConfig.aliases.toSeq) { glob =>
-      esClient.execute {
+      metadataEsClient.execute {
         getAlias(glob)
       }.flatMap { aliasResponse =>
         // Get the alias for every index that has an alias.
@@ -93,7 +117,7 @@ class EsService(
         }
         // Fetch the mappings for each unique alias.
         Future.traverse(aliases.toSet.toSeq) { alias =>
-          esClient.execute {
+          metadataEsClient.execute {
             getMapping(alias)
           }.map { indexMappings =>
             assert(indexMappings.nonEmpty)
@@ -151,15 +175,8 @@ class EsService(
 
   override def execute(compiledQuery: SearchDefinition): Future[TraversableOnce[Hit]] = {
     implicit val ec: ExecutionContext = queryEC
-    val esClient = new EsRetryHttpClient(
-      actualEsClient,
-      actorSystem.scheduler,
-      initialWait = esConfig.retryInitialWait,
-      maxAttempts = esConfig.retryMaxAttempts,
-      statusCodes = esConfig.retryStatusCodes
-    )
 
-    esClient
+    queryEsClient
       .execute {
         compiledQuery
       }
@@ -169,7 +186,11 @@ class EsService(
   override def shutdown(): Future[Unit] = {
     implicit val ec: ExecutionContext = metadataEC
     super.shutdown()
-      .zip(Future { actualEsClient.close() })
+      .zip(Future {
+        metadataEsClient.close()
+        queryEsClient.close()
+        actualEsClient.close()
+      })
       .map(_ => ())
   }
 }

@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.time.Instant
 import javax.inject.{Inject, Singleton}
 
 import scala.collection.mutable
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 import com.sksamuel.elastic4s.Hit
@@ -28,6 +29,7 @@ import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.index.mappings.IndexMappings
 import com.sksamuel.elastic4s.searches.SearchDefinition
 import org.apache.olingo.server.api.uri.queryoption._
+import play.api.http.Status
 import play.api.{Configuration, Logger}
 
 import com.thumbtack.becquerel.datasources._
@@ -42,9 +44,6 @@ class EsService(
 ) extends DataSourceService[AnyRef, Hit, Seq[IndexMappings], SearchDefinition] {
 
   protected override def dssConfig: DataSourceServiceConfig = esConfig.dssConfig
-  protected def url: String = esConfig.url
-  protected def indexes: Set[String] = esConfig.indexes
-  protected def aliases: Set[String] = esConfig.aliases
 
   protected override def logger: Logger = Logger(getClass)
 
@@ -53,21 +52,28 @@ class EsService(
   override def describe: scala.collection.Map[String, String] = {
     val section = mutable.LinkedHashMap.empty[String, String]
     section ++= super.describe
-    section("URL") = url
+    section("URL") = esConfig.url
     section
   }
 
   /**
     * Uses [[org.apache.http.nio.client.HttpAsyncClient]], which has its own thread pool.
     */
-  private val httpClient: HttpClient = HttpClient(url)
+  protected val actualEsClient: HttpClient = HttpClient(esConfig.url)
 
   protected override def fetchDefinitions(): Future[Seq[IndexMappings]] = {
     implicit val ec: ExecutionContext = metadataEC
+    val esClient = new EsRetryHttpClient(
+      actualEsClient,
+      actorSystem.scheduler,
+      initialWait = esConfig.retryInitialWait,
+      maxAttempts = esConfig.retryMaxAttempts,
+      statusCodes = esConfig.retryStatusCodes
+    )
 
     // Fetch the mappings for every index that matches the `indexes` glob.
-    val indexMappingsTask: Future[Seq[IndexMappings]] = Future.traverse(indexes.toSeq) { glob =>
-      httpClient.execute {
+    val indexMappingsTask: Future[Seq[IndexMappings]] = Future.traverse(esConfig.indexes.toSeq) { glob =>
+      esClient.execute {
         // Note: indexes that have disabled mappings with no properties will cause
         // a `java.util.NoSuchElementException` in `GetMappingHttpExecutable`.
         // See https://www.elastic.co/guide/en/elasticsearch/reference/current/enabled.html
@@ -77,8 +83,8 @@ class EsService(
     }.map(_.flatten)
 
     // Fetch the mappings for every alias that matches an `aliases` glob.
-    val aliasMappingsTask: Future[Seq[IndexMappings]] = Future.traverse(aliases.toSeq) { glob =>
-      httpClient.execute {
+    val aliasMappingsTask: Future[Seq[IndexMappings]] = Future.traverse(esConfig.aliases.toSeq) { glob =>
+      esClient.execute {
         getAlias(glob)
       }.flatMap { aliasResponse =>
         // Get the alias for every index that has an alias.
@@ -87,7 +93,7 @@ class EsService(
         }
         // Fetch the mappings for each unique alias.
         Future.traverse(aliases.toSet.toSeq) { alias =>
-          httpClient.execute {
+          esClient.execute {
             getMapping(alias)
           }.map { indexMappings =>
             assert(indexMappings.nonEmpty)
@@ -145,15 +151,25 @@ class EsService(
 
   override def execute(compiledQuery: SearchDefinition): Future[TraversableOnce[Hit]] = {
     implicit val ec: ExecutionContext = queryEC
-    httpClient.execute {
-      compiledQuery
-    }.map(_.hits.hits)
+    val esClient = new EsRetryHttpClient(
+      actualEsClient,
+      actorSystem.scheduler,
+      initialWait = esConfig.retryInitialWait,
+      maxAttempts = esConfig.retryMaxAttempts,
+      statusCodes = esConfig.retryStatusCodes
+    )
+
+    esClient
+      .execute {
+        compiledQuery
+      }
+      .map(_.hits.hits)
   }
 
   override def shutdown(): Future[Unit] = {
     implicit val ec: ExecutionContext = metadataEC
     super.shutdown()
-      .zip(Future { httpClient.close() })
+      .zip(Future { actualEsClient.close() })
       .map(_ => ())
   }
 }
@@ -182,7 +198,10 @@ case class EsServiceConfig(
   dssConfig: DataSourceServiceConfig,
   url: String,
   indexes: Set[String],
-  aliases: Set[String]
+  aliases: Set[String],
+  retryInitialWait: FiniteDuration,
+  retryMaxAttempts: Int,
+  retryStatusCodes: Set[Int]
 )
 
 @Singleton
@@ -207,7 +226,23 @@ class EsServiceConfigFactory @Inject() (
       aliases = conf
         .getStringSeq("aliases")
         .map(_.toSet)
-        .getOrElse(Set.empty)
+        .getOrElse(Set.empty),
+      retryInitialWait = conf
+        .getMilliseconds("retry.initialWait")
+        .map(_.millis)
+        .getOrElse(1.second),
+      retryMaxAttempts = conf
+        .getInt("retry.maxAttempts")
+        .getOrElse(5),
+      retryStatusCodes = conf
+        .getIntSeq("retry.statusCodes")
+        .map(_.map(_.toInt).toSet)
+        .getOrElse(Set(
+          Status.TOO_MANY_REQUESTS,
+          Status.BAD_GATEWAY,
+          Status.SERVICE_UNAVAILABLE,
+          Status.GATEWAY_TIMEOUT
+        ))
     )
   }
 }

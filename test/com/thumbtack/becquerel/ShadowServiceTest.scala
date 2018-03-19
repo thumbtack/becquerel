@@ -227,8 +227,12 @@ class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestEx
         .flatMap(_.query(None, table, null, None, None, None, None, None, None)),
       1.minute
     )
-    assert(result.getEntities.size() === 1)
-    assert(result.getEntities.get(0).getProperty("key").getValue === expectedValue)
+    val resultSize = result.getEntities.size()
+    assert(resultSize === 1,
+      s"Expected exactly one result entity, got $resultSize!")
+    val actualValue = result.getEntities.get(0).getProperty("key").getValue
+    assert(actualValue === expectedValue,
+      s"Expected result entity property named key to have value $expectedValue, got $actualValue!")
   }
 
   /**
@@ -243,8 +247,10 @@ class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestEx
         .zip(testServiceManager("secondary").map(_.asInstanceOf[StubService].queryCount.get())),
       1.minute
     )
-    assert(actualPrimaryCount === expectedPrimaryCount)
-    assert(actualSecondaryCount === expectedSecondaryCount)
+    assert(actualPrimaryCount === expectedPrimaryCount,
+      s"Expected $expectedPrimaryCount queries on primary, saw $actualPrimaryCount queries!")
+    assert(actualSecondaryCount === expectedSecondaryCount,
+      s"Expected $expectedSecondaryCount queries on primary, saw $actualSecondaryCount queries!")
   }
 
   test("shadow query timeout") {

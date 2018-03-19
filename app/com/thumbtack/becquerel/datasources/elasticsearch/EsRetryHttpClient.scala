@@ -40,6 +40,7 @@ class EsRetryHttpClient(
   wrapped: HttpClient,
   scheduler: Scheduler,
   initialWait: FiniteDuration,
+  maxWait: FiniteDuration,
   maxAttempts: Int,
   statusCodes: Set[Int]
 )(
@@ -96,7 +97,7 @@ class EsRetryHttpClient(
       if statusCodes.contains(e.getResponse.getStatusLine.getStatusCode)
         && attempts < maxAttempts =>
 
-      val wait: FiniteDuration = initialWait * Math.pow(2, attempts - 1).toLong
+      val wait: FiniteDuration = (initialWait * Math.pow(2, attempts - 1).toLong).min(maxWait)
 
       logger.warn(s"Retrying rate-limited Elasticsearch request in $wait (attempt $attempts of $maxAttempts)")
 

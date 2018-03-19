@@ -68,21 +68,22 @@ class EsService(
     */
   protected val actualEsClient: HttpClient = HttpClient(esConfig.url)
 
-  protected val metadataEsClient: EsRetryHttpClient = new EsRetryHttpClient(
-    actualEsClient,
-    actorSystem.scheduler,
-    initialWait = esConfig.retryInitialWait,
-    maxAttempts = esConfig.retryMaxAttempts,
-    statusCodes = esConfig.retryStatusCodes
-  )(metadataEC)
+  /**
+    * @return A retrying ES client wrapper from this service's actual ES client and retry config.
+    */
+  protected def newEsClient: ExecutionContext => EsRetryHttpClient = {
+    new EsRetryHttpClient(
+      actualEsClient,
+      actorSystem.scheduler,
+      initialWait = esConfig.retryInitialWait,
+      maxWait = esConfig.retryMaxWait,
+      maxAttempts = esConfig.retryMaxAttempts,
+      statusCodes = esConfig.retryStatusCodes
+    )(_)
+  }
 
-  protected val queryEsClient: EsRetryHttpClient = new EsRetryHttpClient(
-    actualEsClient,
-    actorSystem.scheduler,
-    initialWait = esConfig.retryInitialWait,
-    maxAttempts = esConfig.retryMaxAttempts,
-    statusCodes = esConfig.retryStatusCodes
-  )(queryEC)
+  protected val metadataEsClient: EsRetryHttpClient = newEsClient(metadataEC)
+  protected val queryEsClient: EsRetryHttpClient = newEsClient(queryEC)
 
   protected val pendingRetries: Gauge[Int] = metrics.defaultRegistry.register(
     MetricRegistry.name("service", name, "pendingRetries"),
@@ -221,6 +222,7 @@ case class EsServiceConfig(
   indexes: Set[String],
   aliases: Set[String],
   retryInitialWait: FiniteDuration,
+  retryMaxWait: FiniteDuration,
   retryMaxAttempts: Int,
   retryStatusCodes: Set[Int]
 )
@@ -252,6 +254,10 @@ class EsServiceConfigFactory @Inject() (
         .getMilliseconds("retry.initialWait")
         .map(_.millis)
         .getOrElse(1.second),
+      retryMaxWait = conf
+        .getMilliseconds("retry.maxWait")
+        .map(_.millis)
+        .getOrElse(8.seconds),
       retryMaxAttempts = conf
         .getInt("retry.maxAttempts")
         .getOrElse(5),

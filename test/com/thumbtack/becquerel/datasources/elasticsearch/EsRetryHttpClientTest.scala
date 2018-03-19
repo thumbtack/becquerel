@@ -16,25 +16,20 @@
 
 package com.thumbtack.becquerel.datasources.elasticsearch
 
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-import akka.actor.{Cancellable, Scheduler}
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.HttpClient
-import org.apache.http.concurrent.FutureCallback
+import org.apache.http.HttpHost
 import org.apache.http.impl.nio.client.{CloseableHttpAsyncClient, HttpAsyncClientBuilder}
-import org.apache.http.message.{BasicHttpResponse, BasicStatusLine}
-import org.apache.http.nio.protocol.{HttpAsyncRequestProducer, HttpAsyncResponseConsumer}
-import org.apache.http.protocol.HttpContext
-import org.apache.http.{HttpHost, HttpVersion}
-import org.elasticsearch.client.{ResponseException, RestClient}
 import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback
+import org.elasticsearch.client.{ResponseException, RestClient}
 import org.scalatest.FunSuite
 import play.api.http.Status
+
+import com.thumbtack.becquerel.datasources.elasticsearch.mocks.{MockHttpAsyncClient, MockScheduler}
 
 class EsRetryHttpClientTest extends FunSuite {
 
@@ -64,6 +59,7 @@ class EsRetryHttpClientTest extends FunSuite {
       newEsClient(mockHttpAsyncClient),
       mockScheduler,
       initialWait = 1.second,
+      maxWait = 8.seconds,
       maxAttempts = 5,
       statusCodes = Set(Status.TOO_MANY_REQUESTS)
     )
@@ -86,6 +82,36 @@ class EsRetryHttpClientTest extends FunSuite {
     assert(exception.exists(_.isInstanceOf[ResponseException]))
   }
 
+  test("execute past max wait until giving up") {
+    val mockHttpAsyncClient = new MockHttpAsyncClient(succeedAfter = Int.MaxValue)
+    val mockScheduler = new MockScheduler()
+    val esClient = new EsRetryHttpClient(
+      newEsClient(mockHttpAsyncClient),
+      mockScheduler,
+      initialWait = 1.second,
+      maxWait = 8.seconds,
+      maxAttempts = 6,
+      statusCodes = Set(Status.TOO_MANY_REQUESTS)
+    )
+
+    val exception: Option[Throwable] = try {
+      esClient
+        .execute {
+          indexExists("foo")
+        }
+        .await()
+      None
+    } catch {
+      case NonFatal(e) => Some(e)
+    }
+
+    // Should still fail but only after retrying the expected number of times.
+    assert(mockHttpAsyncClient.numRequests === 6)
+    assert(mockScheduler.delays.size === 5)
+    assert(mockScheduler.delays.sum === 23.seconds)
+    assert(exception.exists(_.isInstanceOf[ResponseException]))
+  }
+
   test("execute with default retries until success") {
     val mockHttpAsyncClient = new MockHttpAsyncClient(succeedAfter = 2)
     val mockScheduler = new MockScheduler()
@@ -93,6 +119,7 @@ class EsRetryHttpClientTest extends FunSuite {
       newEsClient(mockHttpAsyncClient),
       mockScheduler,
       initialWait = 1.second,
+      maxWait = 8.seconds,
       maxAttempts = 5,
       statusCodes = Set(Status.TOO_MANY_REQUESTS)
     )
@@ -151,66 +178,5 @@ class EsRetryHttpClientTest extends FunSuite {
     override def toFloat(x: Duration): Float = ???
     override def toDouble(x: Duration): Double = ???
     override def one: Duration = ???
-  }
-}
-
-/**
-  * Mock HTTP client that does nothing other than return 200 or 429 and count requests.
-  */
-class MockHttpAsyncClient(succeedAfter: Int) extends CloseableHttpAsyncClient {
-  override def start(): Unit = ()
-  override def isRunning: Boolean = true
-  override def close(): Unit = ()
-
-  var numRequests: Int = 0
-
-  override def execute[T](
-    requestProducer: HttpAsyncRequestProducer,
-    responseConsumer: HttpAsyncResponseConsumer[T],
-    context: HttpContext,
-    callback: FutureCallback[T]
-  ): java.util.concurrent.Future[T] = {
-    numRequests += 1
-    val response = new BasicHttpResponse(
-      new BasicStatusLine(
-        HttpVersion.HTTP_1_1,
-        if (numRequests > succeedAfter) {
-          Status.OK
-        } else {
-          Status.TOO_MANY_REQUESTS
-        },
-        null
-      )
-    )
-    responseConsumer.responseReceived(response)
-    responseConsumer.responseCompleted(context)
-    callback.completed(response.asInstanceOf[T])
-    null
-  }
-}
-
-/**
-  * Mock Akka scheduler that runs everything immediately, but keeps track of how long it would have waited.
-  */
-//noinspection NotImplementedCode
-class MockScheduler extends Scheduler {
-  override def schedule(initialDelay: FiniteDuration, interval: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = ???
-  override def maxFrequency: Double = ???
-
-  val delays: mutable.Buffer[Duration] = mutable.Buffer.empty[Duration]
-
-  override def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = {
-    delays += delay
-    runnable.run()
-    new Cancellable {
-      private var cancelled = false
-
-      override def cancel(): Boolean = {
-        cancelled = true
-        true
-      }
-
-      override def isCancelled: Boolean = cancelled
-    }
   }
 }

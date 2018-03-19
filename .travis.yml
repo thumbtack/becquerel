@@ -18,17 +18,20 @@ services:
   - elasticsearch
 
 before_script:
-  # Create integration test config by removing bq, shadow, and metrics sections from example config.
-  - "sed '/^  bq {/,/^  }/d; /^  shadow {/,/^  }/d; /^metrics {/,/^}/d' conf/application-example.conf > conf/application.conf"
-  - "sed '/^  bq {/,/^  }/d' conf/demo-example.conf > conf/demo.conf"
+  # Create integration test config by removing shadow and metrics sections from example config.
+  - "sed '/^  shadow {/,/^  }/d; /^metrics {/,/^}/d' conf/application-example.conf > conf/application.conf"
+  - "cp conf/demo-example.conf conf/demo.conf"
   - 'cp conf/logback-example.xml conf/logback.xml'
 
   # Download test data.
   - "sh -c 'cd test_data && ./ds2_download.sh'"
 
-  # Load test data into ES and PG (not testing against BQ for now).
+  # Load test data into ES and PG.
   - "sbt ++$TRAVIS_SCALA_VERSION 'runMain com.thumbtack.becquerel.demo.EsDemoLoader' && export ES_TESTS=true"
   - "sbt ++$TRAVIS_SCALA_VERSION 'runMain com.thumbtack.becquerel.demo.PgDemoLoader' && export PG_TESTS=true"
+
+  # Decrypt BQ test account credentials. See <https://docs.travis-ci.com/user/encrypting-files/>.
+  - "openssl aes-256-cbc -K $encrypted_edd60214399b_key -iv $encrypted_edd60214399b_iv -in bq-credentials.json.enc -out bq-credentials.json -d && export BQ_TESTS=true"
 
   # Enable integration tests.
   - 'export INTEGRATION_TESTS=true'

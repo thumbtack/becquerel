@@ -20,7 +20,7 @@ import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
 import org.scalatest.FunSuite
 import org.scalatestplus.play.OneServerPerSuite
-import play.api.Application
+import play.api.{Application, Configuration}
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.JsObject
@@ -28,8 +28,7 @@ import play.api.libs.ws.WSClient
 
 import com.thumbtack.becquerel.{BecquerelServiceManager, EnvGuardedSuite, EnvGuardedTests}
 import com.thumbtack.becquerel.demo.EsDemoConfig
-
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -82,5 +81,42 @@ class IntegrationTest extends FunSuite with EnvGuardedTests with OneServerPerSui
 
   envGuardedTest("PG_TESTS")("find AIRPORT POTLUCK in PG") {
     findMovie("pg", "ds2__public__")
+  }
+
+  envGuardedTest("BQ_TESTS")("find AIRPORT POTLUCK in BQ") {
+    findMovie("bq", "dvdstore__")
+  }
+
+  test("index page") {
+    // Wait for all services to be ready.
+    val serviceNames = app.injector.instanceOf[Configuration]
+      .getConfig("services")
+      .toSeq
+      .flatMap(_.subKeys)
+    val serviceManager = app.injector.instanceOf[BecquerelServiceManager]
+    val servicesReadyFuture = Future.traverse(serviceNames) { serviceName =>
+      serviceManager(serviceName).flatMap[DataSourceMetadata[_, _]] { service =>
+        service
+          .asInstanceOf[DataSourceService[_, _, _, _]]
+          .metadataPromise
+          .future
+      }
+    }
+    Await.result(servicesReadyFuture, timeout)
+
+    // Render the index page.
+    val wsClient: WSClient = app.injector.instanceOf[WSClient]
+    val response: String = Await.result(
+      wsClient.url(
+        s"http://localhost:$port/"
+      ).get(),
+      timeout
+    ).body
+
+    // Check it for info on Becquerel and each configured service.
+    assert(response.contains("Build info"))
+    for (serviceName <- serviceNames) {
+      assert(response.contains(s"service $serviceName"))
+    }
   }
 }

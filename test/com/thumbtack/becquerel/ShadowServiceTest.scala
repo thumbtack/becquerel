@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -31,7 +31,17 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration._
 
-class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestExecution {
+/**
+  * Test that the shadow service works correctly with various failure conditions.
+  *
+  * @note The shadow service tests use a real clock and Play timeouts, which aren't mocked yet.
+  *       They tend to fail a lot during Travis CI builds, probably because Travis build environments
+  *       are slower and have fewer cores than a developer machine, so we don't test this in Travis for now.
+  */
+class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestExecution with EnvGuardedSuite {
+
+  override val guardEnvVarNames: Seq[String] = Seq.empty
+  override val blockEnvVarNames: Seq[String] = Seq("TRAVIS")
 
   /**
     * Stub entity set that only has a name.
@@ -227,8 +237,12 @@ class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestEx
         .flatMap(_.query(None, table, null, None, None, None, None, None, None)),
       1.minute
     )
-    assert(result.getEntities.size() === 1)
-    assert(result.getEntities.get(0).getProperty("key").getValue === expectedValue)
+    val resultSize = result.getEntities.size()
+    assert(resultSize === 1,
+      s"Expected exactly one result entity, got $resultSize!")
+    val actualValue = result.getEntities.get(0).getProperty("key").getValue
+    assert(actualValue === expectedValue,
+      s"Expected result entity property named key to have value $expectedValue, got $actualValue!")
   }
 
   /**
@@ -243,8 +257,10 @@ class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestEx
         .zip(testServiceManager("secondary").map(_.asInstanceOf[StubService].queryCount.get())),
       1.minute
     )
-    assert(actualPrimaryCount === expectedPrimaryCount)
-    assert(actualSecondaryCount === expectedSecondaryCount)
+    assert(actualPrimaryCount === expectedPrimaryCount,
+      s"Expected $expectedPrimaryCount queries on primary, saw $actualPrimaryCount queries!")
+    assert(actualSecondaryCount === expectedSecondaryCount,
+      s"Expected $expectedSecondaryCount queries on primary, saw $actualSecondaryCount queries!")
   }
 
   test("shadow query timeout") {

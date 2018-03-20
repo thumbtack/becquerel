@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -38,7 +38,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
   */
 class IntegrationTest extends FunSuite with EnvGuardedTests with OneServerPerSuite with EnvGuardedSuite {
 
-  override val guardEnvVarNames = Seq("INTEGRATION_TESTS")
+  override val guardEnvVarNames: Seq[String] = Seq("INTEGRATION_TESTS")
+  override val blockEnvVarNames: Seq[String] = Seq.empty
 
   override lazy val app: Application = {
     GuiceApplicationBuilder()

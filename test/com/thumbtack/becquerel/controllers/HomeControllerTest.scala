@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -16,24 +16,28 @@
 
 package com.thumbtack.becquerel.controllers
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.xml.{Elem, XML => ScalaXML}
+
 import com.codahale.metrics.MetricRegistry
+import com.google.cloud.bigquery.TableDefinition
 import com.kenshoo.play.metrics.Metrics
 import org.scalatest.FunSuite
 import org.scalatestplus.play.OneAppPerSuite
-import play.api.{Application, Configuration}
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.{JsLookupResult, JsValue}
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import play.api.{Application, Configuration}
 
-import com.google.cloud.bigquery.TableDefinition
-
+import com.thumbtack.becquerel.BecquerelServiceManager
+import com.thumbtack.becquerel.datasources.{DataSourceMetadata, DataSourceService}
 import com.thumbtack.becquerel.datasources.bigquery.mocks.{MockBigQuery, MockBqBuilder, MockQueryResponse, MockQueryResult}
 import com.thumbtack.becquerel.datasources.bigquery.{BqBuilder, BqService, SharedData}
 import com.thumbtack.becquerel.modules.BecquerelServiceModule
-
-import scala.xml.{Elem, XML => ScalaXML}
 
 class HomeControllerTest extends FunSuite with OneAppPerSuite {
   /**
@@ -90,7 +94,6 @@ class HomeControllerTest extends FunSuite with OneAppPerSuite {
               "projects" -> Seq(SharedData.projectId),
               "omitProjectID" -> false,
               "namespace" -> SharedData.namespace,
-              // Otherwise tests will fail.
               "metadataRefreshDelayMax" -> "0s"
             )
           )
@@ -108,6 +111,22 @@ class HomeControllerTest extends FunSuite with OneAppPerSuite {
       .build
   }
 
+  def waitForMetadataFetch(): Unit = {
+    Await.result(
+      app
+        .injector
+        .instanceOf[BecquerelServiceManager]
+        .apply("bq")
+        .flatMap[DataSourceMetadata[_, _]] { service =>
+          service
+            .asInstanceOf[DataSourceService[_, _, _, _]]
+            .metadataPromise
+            .future
+        },
+      10.seconds
+    )
+  }
+
   test("get status page") {
     val Some(response) = route(app, FakeRequest(GET, "/"))
     assert(status(response) === OK)
@@ -116,6 +135,8 @@ class HomeControllerTest extends FunSuite with OneAppPerSuite {
   }
 
   test("get service") {
+    waitForMetadataFetch()
+
     val Some(response) = route(app, FakeRequest(GET, "/bq/").withHeaders("Accept" -> JSON))
     assert(status(response) === OK)
     assert(contentType(response).exists(_.startsWith(JSON)))
@@ -125,6 +146,8 @@ class HomeControllerTest extends FunSuite with OneAppPerSuite {
   }
 
   test("get metadata") {
+    waitForMetadataFetch()
+
     val Some(response) = route(app, FakeRequest(GET, "/bq/$metadata"))
     assert(status(response) === OK)
     assert(contentType(response).contains(XML))
@@ -135,6 +158,8 @@ class HomeControllerTest extends FunSuite with OneAppPerSuite {
   }
 
   test("run query") {
+    waitForMetadataFetch()
+
     val Some(response) = route(app, FakeRequest(GET, "/bq/project__test__customers").withHeaders("Accept" -> JSON))
     assert(status(response) === OK)
     assert(contentType(response).exists(_.startsWith(JSON)))

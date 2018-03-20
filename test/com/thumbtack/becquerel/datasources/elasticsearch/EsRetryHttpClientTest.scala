@@ -14,6 +14,8 @@
  *    limitations under the License.
  */
 
+// scalastyle:off magic.number
+
 package com.thumbtack.becquerel.datasources.elasticsearch
 
 import scala.concurrent.ExecutionContext.Implicits.global

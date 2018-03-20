@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -34,6 +34,12 @@ case class BqFieldMapper(
 ) extends FieldMapper[FieldValue]
 
 object BqFieldMapper {
+
+  /**
+    * BigQuery supports microsecond time resolution (6 decimal digits).
+    */
+  val BqTimePrecision = 6
+
   def apply(namespace: String, parentTypeName: String)(field: Field): BqFieldMapper = {
     val bqName = field.getName
     val odataName = ODataStrings.sanitizeName(field.getName)
@@ -73,10 +79,9 @@ object BqFieldMapper {
     }
 
     val precision: Option[Int] = field.getType.getValue match {
-      // BigQuery supports microsecond time resolution.
       case LegacySQLTypeName.DATETIME |
            LegacySQLTypeName.TIME |
-           LegacySQLTypeName.TIMESTAMP => Some(6)
+           LegacySQLTypeName.TIMESTAMP => Some(BqTimePrecision)
       case _ => None
     }
 

@@ -260,7 +260,7 @@ class EsServiceConfigFactory @Inject() (
         .getOrElse(8.seconds),
       retryMaxAttempts = conf
         .getInt("retry.maxAttempts")
-        .getOrElse(5),
+        .getOrElse(5), // scalastyle:ignore magic.number
       retryStatusCodes = conf
         .getIntSeq("retry.statusCodes")
         .map(_.map(_.toInt).toSet)

@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ object SharedData {
     */
   val rows: Seq[Seq[FieldValue]] = Seq(
     Seq(
-      MockFieldValue(FieldValue.Attribute.PRIMITIVE, 101),
+      MockFieldValue(FieldValue.Attribute.PRIMITIVE, 101), // scalastyle:ignore magic.number
       MockFieldValue(FieldValue.Attribute.PRIMITIVE, "Jessica"),
       MockFieldValue(FieldValue.Attribute.PRIMITIVE, "Atreides"),
       MockFieldValue(FieldValue.Attribute.REPEATED, Seq(

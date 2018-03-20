@@ -1,6 +1,13 @@
 dist: trusty
 sudo: false
 
+# Build only master and tags:
+# https://docs.travis-ci.com/user/customizing-the-build/#Safelisting-or-blocklisting-branches
+branches:
+  only:
+    - master
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
+
 language: scala
 scala: "2.11.8"
 
@@ -37,6 +44,8 @@ before_script:
   - 'export INTEGRATION_TESTS=true'
 
 script:
+  - 'sbt ++$TRAVIS_SCALA_VERSION scalastyle'
+  - 'sbt ++$TRAVIS_SCALA_VERSION test:scalastyle'
   - 'sbt ++$TRAVIS_SCALA_VERSION coverage test coverageReport'
 
 after_success:

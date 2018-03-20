@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -16,20 +16,22 @@
 
 package com.thumbtack.becquerel.datasources.elasticsearch
 
+import scala.collection.JavaConverters._
+
 import com.sksamuel.elastic4s.Hit
-import com.thumbtack.becquerel.datasources.{FieldMapper, RowMapper, TableMapper}
-import org.apache.olingo.server.api.ODataApplicationException
 import org.apache.olingo.server.api.uri.UriResourceProperty
 import org.apache.olingo.server.api.uri.queryoption.{SelectItem, SelectOption}
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext
 
-import scala.collection.JavaConverters._
+import com.thumbtack.becquerel.datasources.{FieldMapper, RowMapper, TableMapper}
+import com.thumbtack.becquerel.util.BecquerelException
 
 /**
   * Filter the _source field on results so that a search only returns named top-level properties.
   *
   * @see https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-source-filtering.html
   */
+//noinspection NotImplementedCode
 object EsSelectCompiler {
 
   def compile(
@@ -69,10 +71,7 @@ object EsSelectCompiler {
           val fieldMapper = tableMapper.rowMapper.fieldMappers
             .find(_.property.getName == head.getProperty.getName)
             .getOrElse {
-              throw new ODataApplicationException(
-                s"Couldn't resolve property: ${head.getProperty.getName}",
-                500,
-                null)
+              throw new BecquerelException(s"Couldn't resolve property: ${head.getProperty.getName}")
             }
           fieldMapper -> fieldMapper.name
 

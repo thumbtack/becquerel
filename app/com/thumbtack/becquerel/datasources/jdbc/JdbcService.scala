@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -117,8 +117,8 @@ class JdbcService(
                 dialect.getDatabaseProduct match {
                   case DatabaseProduct.POSTGRESQL => dataType.intValue() match {
                     case Types.DECIMAL | Types.NUMERIC => size match {
-                      case x: Integer if x > 1000 =>
-                        Some(16383) // Max scale as of PG 9.x.
+                      case x: Integer if x > JdbcService.PgScaleOverrideSizeThreshold =>
+                        Some(JdbcService.PgMaxScale)
                       case _ => None
                     }
                     case _ => None
@@ -201,6 +201,19 @@ class JdbcService(
       }
     }
   }
+}
+
+object JdbcService {
+
+  /**
+    * Column size threshold for detecting a default scale.
+    */
+  val PgScaleOverrideSizeThreshold = 1000
+
+  /**
+    * Max scale as of PG 9.x.
+    */
+  val PgMaxScale = 16383
 }
 
 /**

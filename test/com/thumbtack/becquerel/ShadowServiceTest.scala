@@ -31,7 +31,17 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration._
 
-class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestExecution {
+/**
+  * Test that the shadow service works correctly with various failure conditions.
+  *
+  * @note The shadow service tests use a real clock and Play timeouts, which aren't mocked yet.
+  *       They tend to fail a lot during Travis CI builds, probably because Travis build environments
+  *       are slower and have fewer cores than a developer machine, so we don't test this in Travis for now.
+  */
+class ShadowServiceTest extends FunSuite with BeforeAndAfter with ParallelTestExecution with EnvGuardedSuite {
+
+  override val guardEnvVarNames: Seq[String] = Seq.empty
+  override val blockEnvVarNames: Seq[String] = Seq("TRAVIS")
 
   /**
     * Stub entity set that only has a name.

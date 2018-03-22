@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -16,16 +16,15 @@
 
 package com.thumbtack.becquerel.datasources.sql
 
-import com.sksamuel.elastic4s.Hit
-import com.thumbtack.becquerel.datasources.{FieldMapper, RowMapper, TableMapper}
+import scala.collection.JavaConverters._
+
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.{SqlIdentifier, SqlNode, SqlNodeList}
-import org.apache.olingo.server.api.ODataApplicationException
 import org.apache.olingo.server.api.uri.UriResourceProperty
 import org.apache.olingo.server.api.uri.queryoption.{SelectItem, SelectOption}
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
 
-import scala.collection.JavaConverters._
+import com.thumbtack.becquerel.datasources.{FieldMapper, RowMapper, TableMapper}
+import com.thumbtack.becquerel.util.BecquerelException
 
 /**
   * Translate a subset of OData `$$select` expressions to a Calcite SQL AST and a row mapper.
@@ -79,10 +78,7 @@ object SqlSelectCompiler {
           val fieldMapper = tableMapper.rowMapper.fieldMappers
             .find(_.property.getName == head.getProperty.getName)
             .getOrElse {
-              throw new ODataApplicationException(
-                s"Couldn't resolve property: ${head.getProperty.getName}",
-                500,
-                null)
+              throw new BecquerelException(s"Couldn't resolve property: ${head.getProperty.getName}")
             }
           fieldMapper -> new SqlIdentifier(fieldMapper.name, SqlParserPos.ZERO)
 

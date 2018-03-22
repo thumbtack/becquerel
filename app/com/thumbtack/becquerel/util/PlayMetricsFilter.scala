@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -25,5 +25,5 @@ import com.kenshoo.play.metrics.{Metrics, MetricsFilterImpl}
   * Shorten name for metrics on HTTP requests.
   */
 class PlayMetricsFilter @Inject() (metrics: Metrics)(override implicit val mat: Materializer) extends MetricsFilterImpl(metrics)(mat) {
-  override def labelPrefix = "play"
+  override def labelPrefix: String = "play"
 }

@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ class HomeController @Inject() (
   /**
     * Show system status, service configuration, and request headers.
     */
-  def index = Action { request =>
+  def index: Action[AnyContent] = Action { request =>
     val env = mutable.LinkedHashMap.empty[String, scala.collection.Map[String, String]]
 
     env ++= serviceManager.describe

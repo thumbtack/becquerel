@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ class SystemInfo @Inject() (
 
     val shouldCensor = censorMatcher.exists(_.matches(name))
     if (shouldCensor) {
-      value.substring(0, 4) + "…"
+      value.substring(0, SystemInfo.CensorPrefixLength) + "…"
     } else {
       value
     }
@@ -138,4 +138,8 @@ class SystemInfo @Inject() (
     section("Max memory") = StorageUnit.fromBytes(runtime.maxMemory()).toHuman()
     section
   }
+}
+
+object SystemInfo {
+  val CensorPrefixLength = 4
 }

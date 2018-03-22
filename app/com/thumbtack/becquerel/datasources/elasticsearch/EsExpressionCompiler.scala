@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -256,6 +256,7 @@ object EsExpressionCompiler extends ExpressionVisitor[EsAstNode] {
       .replaceAll("""\&\&""", """\\&\\&""")
   }
 
+  // scalastyle:off line.size.limit
   /**
     * OData's search expression syntax is a subset of ES query string syntax.
     * Like OData, ES NOT binds tighter than AND, which binds tighter than OR.
@@ -263,6 +264,7 @@ object EsExpressionCompiler extends ExpressionVisitor[EsAstNode] {
     * @see http://docs.oasis-open.org/odata/odata/v4.0/errata03/os/complete/part2-url-conventions/odata-v4.0-errata03-os-part2-url-conventions-complete.html#Search_Expression
     * @see https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax
     */
+  // scalastyle:on line.size.limit
   protected def translateSearchExpression(expr: SearchExpression): String = {
     expr match {
 

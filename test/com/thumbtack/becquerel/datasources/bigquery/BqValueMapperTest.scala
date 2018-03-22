@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -49,8 +49,8 @@ class BqValueMapperTest extends FunSuite {
       isUnicode)
   }
 
-  val bqDatePrecision = None
-  val bqTimePrecision = Some(6)
+  val bqDatePrecision: Option[Int] = None
+  val bqTimePrecision: Option[Int] = Some(BqFieldMapper.BqTimePrecision)
 
   test("BqDateMapper") {
     val value = BqDateMapper(

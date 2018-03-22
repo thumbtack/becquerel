@@ -1,5 +1,5 @@
 /*
- *    Copyright 2017 Thumbtack
+ *    Copyright 2017–2018 Thumbtack
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -290,11 +290,13 @@ trait SqlExpressionCompiler extends ExpressionVisitor[SqlNode] {
       }
   }
 
+  // scalastyle:off line.size.limit
   /**
     * Translate an OData free-text search expression into SQL by applying it to the given columns.
     *
     * @see http://docs.oasis-open.org/odata/odata/v4.0/errata03/os/complete/part2-url-conventions/odata-v4.0-errata03-os-part2-url-conventions-complete.html#Search_Expression
     */
+  // scalastyle:on line.size.limit
   protected def translateSearchExpression(
     columnsAsStrings: Seq[SqlNode],
     expr: SearchExpression

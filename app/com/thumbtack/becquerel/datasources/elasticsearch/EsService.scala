@@ -55,7 +55,7 @@ class EsService(
     section ++= super.describe
     section("URL") = esConfig.url
     section("Indexes") = esConfig.indexes.toSeq.sorted.mkString(", ")
-    section("Aliases") = esConfig.indexes.toSeq.sorted.mkString(", ")
+    section("Aliases") = esConfig.aliases.toSeq.sorted.mkString(", ")
     section("Retry initial wait") = esConfig.retryInitialWait.toString
     section("Retry max attempts") = esConfig.retryMaxAttempts.toString
     section("Retry status codes") = esConfig.retryStatusCodes.toSeq.sorted.mkString(", ")

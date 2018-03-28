@@ -24,7 +24,8 @@ import org.apache.olingo.commons.api.edm.EdmPrimitiveTypeKind
 import com.thumbtack.becquerel.datasources.{NullableMapper, PrimitiveMapper, ValueMapper}
 
 /**
-  * Just pass the Java object value through and hope OData knows what to do with it.
+  * Parse some ES types that are serialized as strings or numbers; in most other cases,
+  * pass the Java object value through and hope OData knows what to do with it.
   *
   * @see [[org.apache.olingo.commons.core.edm.primitivetype.AbstractPrimitiveType#internalValueToString]]
   */
@@ -40,6 +41,7 @@ case class EsPrimitiveMapper(
 
       case EdmPrimitiveTypeKind.Int64 => fieldValue match {
         case string: String => string.toLong
+        case int: java.lang.Integer => int.toLong
         case long: java.lang.Long => long
         case _ => throw new IllegalArgumentException(s"Unexpected type for long field: ${fieldValue.getClass}")
       }
@@ -52,6 +54,7 @@ case class EsPrimitiveMapper(
             case _: NumberFormatException =>
               Date.valueOf(LocalDate.parse(date))
           }
+        case epochMillis: java.lang.Integer => Date.valueOf(LocalDate.from(Instant.ofEpochMilli(epochMillis.toLong)))
         case epochMillis: java.lang.Long => Date.valueOf(LocalDate.from(Instant.ofEpochMilli(epochMillis)))
         case _ => throw new IllegalArgumentException(s"Unexpected type for date field: ${fieldValue.getClass}")
       }
@@ -64,6 +67,7 @@ case class EsPrimitiveMapper(
             case _: NumberFormatException =>
               Timestamp.from(Instant.parse(datetime))
           }
+        case epochMillis: java.lang.Integer => Timestamp.from(Instant.ofEpochMilli(epochMillis.toLong))
         case epochMillis: java.lang.Long => Timestamp.from(Instant.ofEpochMilli(epochMillis))
         case _ => throw new IllegalArgumentException(s"Unexpected type for datetime field: ${fieldValue.getClass}")
       }

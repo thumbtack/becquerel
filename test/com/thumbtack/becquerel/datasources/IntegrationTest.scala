@@ -57,17 +57,14 @@ class IntegrationTest extends FunSuite with EnvGuardedTests with OneServerPerSui
   /**
     * Wait for a service to initialize, then try to find the movie AIRPORT POTLUCK.
     */
-  def findMovie(serviceName: String, prefix: String): Unit = {
+  def findMovie(serviceName: String, url: String): Unit = {
     val serviceManager = app.injector.instanceOf[BecquerelServiceManager]
     val wsClient: WSClient = app.injector.instanceOf[WSClient]
     val response = Await.result(
       serviceManager(serviceName)
         .flatMap(_.asInstanceOf[DataSourceService[Any, Any, Any, Any]].metadataPromise.future)
         .flatMap { _ =>
-          wsClient.url(
-            s"http://localhost:$port/$serviceName/${prefix}products" +
-              "?$format=json&$filter=%27AIRPORT%20POTLUCK%27%20eq%20title"
-          ).get()
+          wsClient.url(url).get()
       },
       timeout
     ).json
@@ -76,15 +73,39 @@ class IntegrationTest extends FunSuite with EnvGuardedTests with OneServerPerSui
   }
 
   envGuardedTest("ES_TESTS")("find AIRPORT POTLUCK in ES") {
-    findMovie("es", s"${EsDemoConfig.indexPrefix}")
+    val serviceName = "es"
+    val prefix = EsDemoConfig.indexPrefix
+    findMovie(serviceName,
+      s"http://localhost:$port/$serviceName/${prefix}products" +
+        "?$format=json&$filter=%27AIRPORT%20POTLUCK%27%20eq%20title"
+    )
+  }
+
+  envGuardedTest("ES_TESTS")("search AIRPORT POTLUCK in ES") {
+    val serviceName = "es"
+    val prefix = EsDemoConfig.indexPrefix
+    findMovie(serviceName,
+      s"http://localhost:$port/$serviceName/${prefix}products" +
+        "?$format=json&$search=%22AIRPORT%20POTLUCK%22"
+    )
   }
 
   envGuardedTest("PG_TESTS")("find AIRPORT POTLUCK in PG") {
-    findMovie("pg", "ds2__public__")
+    val serviceName = "pg"
+    val prefix = "ds2__public__"
+    findMovie(serviceName,
+      s"http://localhost:$port/$serviceName/${prefix}products" +
+        "?$format=json&$filter=%27AIRPORT%20POTLUCK%27%20eq%20title"
+    )
   }
 
   envGuardedTest("BQ_TESTS")("find AIRPORT POTLUCK in BQ") {
-    findMovie("bq", "dvdstore__")
+    val serviceName = "bq"
+    val prefix = "dvdstore__"
+    findMovie(serviceName,
+      s"http://localhost:$port/$serviceName/${prefix}products" +
+        "?$format=json&$filter=%27AIRPORT%20POTLUCK%27%20eq%20title"
+    )
   }
 
   test("index page") {

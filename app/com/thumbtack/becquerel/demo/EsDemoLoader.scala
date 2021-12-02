@@ -56,7 +56,7 @@ object EsDemoLoader {
         }
 
         esClient.execute {
-          createIndex(indexName) mappings esTable.mapping
+          createIndex(indexName) mapping esTable.mapping
         }.await
         println(s"Created index $indexName.")
 

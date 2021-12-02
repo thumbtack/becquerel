@@ -19,7 +19,7 @@ package com.thumbtack.becquerel.datasources.elasticsearch
 import com.sksamuel.elastic4s.requests.common.FetchSourceContext
 import com.sksamuel.elastic4s.requests.searches.SearchRequest
 import com.sksamuel.elastic4s.requests.searches.queries.{BoolQuery, Query}
-import com.sksamuel.elastic4s.{Hit, Indexes, IndexesAndTypes}
+import com.sksamuel.elastic4s.{Hit, Indexes}
 import com.thumbtack.becquerel.datasources.{RowMapper, TableMapper}
 import org.apache.olingo.server.api.uri.queryoption._
 
@@ -40,10 +40,6 @@ object EsQueryCompiler {
 
     val (rowMapper: RowMapper[AnyRef, Hit], fetchContext: Option[FetchSourceContext]) = EsSelectCompiler
       .compile(tableMapper, select)
-
-    val indexesAndTypes: IndexesAndTypes = tableMapper.tableIDParts match {
-      case Seq(index, mapping) => IndexesAndTypes(index, mapping)
-    }
 
     val indexes: Indexes = tableMapper.tableIDParts match {
       case Seq(index, _) => Indexes(Seq(index))

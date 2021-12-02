@@ -71,6 +71,8 @@ class HomeController @Inject() (
     * Publish a service as OData.
     */
   def odataService(name: String, path: String): Action[RawBuffer] = {
+    logger.info(s"odataService: Received request. name=$name path=$path")
+
     Action.async(parse.raw) { request =>
       implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
 
@@ -78,10 +80,15 @@ class HomeController @Inject() (
 
       serviceManager(name).map { service =>
 
+        logger.info(s"service.name=${service.name} service.describe=${service.describe}")
+        // logger.info(s"service.metadata=${service.metadata}")
+
         val odata = OData.newInstance()
         val edm = odata.createServiceMetadata(service.metadata, Seq.empty[EdmxReference].asJava)
         val handler = odata.createHandler(edm)
         handler.register(new BecquerelServiceEntityCollectionProcessor(service, runID))
+
+        logger.info(s"Registered handler for service: $name")
 
         implicit val requestHeader: RequestHeader = request
         val reverseRouter = routes.HomeController.odataService(name, path)

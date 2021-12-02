@@ -19,7 +19,7 @@ package com.thumbtack.becquerel
 import javax.inject.{Inject, Singleton}
 
 import com.thumbtack.becquerel.util.BecquerelException
-import play.api.Configuration
+import play.api.{Configuration, Logger}
 import play.api.inject.ApplicationLifecycle
 
 import scala.collection.mutable
@@ -55,6 +55,8 @@ class BecquerelServiceManagerImpl @Inject() (
     */
   private val orderedServices = mutable.LinkedHashMap.empty[String, Future[BecquerelService]]
 
+  private def logger: Logger = Logger(getClass)
+
   /**
     * Create services from the configuration.
     */
@@ -69,17 +71,23 @@ class BecquerelServiceManagerImpl @Inject() (
     confs
       .subKeys
       .foreach { name =>
+        logger.info(s"Initializing service $name")
         val conf = confs.getConfig(name).get ++ Configuration("name" -> name)
         val typeName = conf.getString("type").getOrElse {
+          logger.error(s"Service $name must have a type.")
           throw new BecquerelException(s"Service $name must have a type.")
         }
         val future: Future[BecquerelService] = factoryRegistry(typeName).map(_(conf, this))
         orderedServices(name) = future
         future.onSuccess { case service =>
           // Start metadata refresh thread.
+          logger.info(s"Starting service $name")
           service.start()
           // Stop it when the app stops.
           lifecycle.addStopHook(() => service.shutdown())
+        }
+        future.onFailure { case service =>
+          logger.error(s"Failed service $name")
         }
         // TODO: add an init timeout and logging if it takes too long.
       }

@@ -19,9 +19,9 @@ package com.thumbtack.becquerel.datasources.elasticsearch
 import scala.collection.JavaConverters._
 
 import com.sksamuel.elastic4s.Hit
+import com.sksamuel.elastic4s.requests.common.FetchSourceContext
 import org.apache.olingo.server.api.uri.UriResourceProperty
 import org.apache.olingo.server.api.uri.queryoption.{SelectItem, SelectOption}
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
 
 import com.thumbtack.becquerel.datasources.{FieldMapper, RowMapper, TableMapper}
 import com.thumbtack.becquerel.util.BecquerelException
@@ -43,11 +43,8 @@ object EsSelectCompiler {
       .map(_.getSelectItems.asScala)
       .map(_.map(resolve(tableMapper)))
       .map { fields =>
-
         val rowMapper = tableMapper.rowMapper.withFields(fields.map(_._1))
-
-        val sourceFilter = new FetchSourceContext(true, fields.map(_._2).toArray, Array.empty[String])
-
+        val sourceFilter = new FetchSourceContext(true, fields.map(_._2).toSet, Set.empty[String])
         (rowMapper, Some(sourceFilter): Option[FetchSourceContext])
       }
       .getOrElse((tableMapper.rowMapper, None)) // Don't filter the source.

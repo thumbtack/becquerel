@@ -18,9 +18,9 @@ package com.thumbtack.becquerel.datasources.elasticsearch
 
 import java.time.{LocalDate, LocalTime, ZonedDateTime}
 
-import com.sksamuel.elastic4s.searches.queries._
-import com.sksamuel.elastic4s.searches.queries.term.TermQueryDefinition
-import com.sksamuel.elastic4s.searches.sort.{FieldSortDefinition, SortDefinition}
+import com.sksamuel.elastic4s.requests.searches.queries._
+import com.sksamuel.elastic4s.requests.searches.queries.term.TermQuery
+import com.sksamuel.elastic4s.requests.searches.sort.{FieldSort, Sort, SortOrder}
 
 import com.thumbtack.becquerel.datasources.ODataStrings
 import org.apache.olingo.commons.api.edm.constants.EdmTypeKind
@@ -29,7 +29,6 @@ import org.apache.olingo.server.api.uri.UriResourceProperty
 import org.apache.olingo.server.api.uri.queryoption.expression._
 import org.apache.olingo.server.api.uri.queryoption.search._
 import org.apache.olingo.server.api.uri.queryoption.{FilterOption, OrderByOption, SearchOption}
-import org.elasticsearch.search.sort.SortOrder
 import scala.collection.JavaConverters._
 
 //noinspection NotImplementedCode
@@ -39,7 +38,7 @@ object EsExpressionCompiler extends ExpressionVisitor[EsAstNode] {
     expression.accept(this)
   }
 
-  def compileFilter(filter: Option[FilterOption]): Option[QueryDefinition] = {
+  def compileFilter(filter: Option[FilterOption]): Option[Query] = {
     filter
       .map(_.getExpression)
       .map(compile)
@@ -60,38 +59,38 @@ object EsExpressionCompiler extends ExpressionVisitor[EsAstNode] {
     }
   }
 
-  def nodeToQueryDef(node: EsAstNode): QueryDefinition = {
+  def nodeToQueryDef(node: EsAstNode): Query = {
     node match {
 
-      case EsEquals(EsField(name), EsLiteral(value)) => TermQueryDefinition(name, value)
-      case EsEquals(EsLiteral(value), EsField(name)) => TermQueryDefinition(name, value)
+      case EsEquals(EsField(name), EsLiteral(value)) => TermQuery(name, value)
+      case EsEquals(EsLiteral(value), EsField(name)) => TermQuery(name, value)
 
-      case EsGreaterThan(EsField(name), EsLiteral(value)) => RangeQueryDefinition(name, gt = asRangeParam(value))
-      case EsGreaterThan(EsLiteral(value), EsField(name)) => RangeQueryDefinition(name, lte = asRangeParam(value))
+      case EsGreaterThan(EsField(name), EsLiteral(value)) => RangeQuery(name, gt = asRangeParam(value))
+      case EsGreaterThan(EsLiteral(value), EsField(name)) => RangeQuery(name, lte = asRangeParam(value))
 
-      case EsGreaterThanOrEqual(EsField(name), EsLiteral(value)) => RangeQueryDefinition(name, gte = asRangeParam(value))
-      case EsGreaterThanOrEqual(EsLiteral(value), EsField(name)) => RangeQueryDefinition(name, lt = asRangeParam(value))
+      case EsGreaterThanOrEqual(EsField(name), EsLiteral(value)) => RangeQuery(name, gte = asRangeParam(value))
+      case EsGreaterThanOrEqual(EsLiteral(value), EsField(name)) => RangeQuery(name, lt = asRangeParam(value))
 
-      case EsLessThan(EsField(name), EsLiteral(value)) => RangeQueryDefinition(name, lt = asRangeParam(value))
-      case EsLessThan(EsLiteral(value), EsField(name)) => RangeQueryDefinition(name, gte = asRangeParam(value))
+      case EsLessThan(EsField(name), EsLiteral(value)) => RangeQuery(name, lt = asRangeParam(value))
+      case EsLessThan(EsLiteral(value), EsField(name)) => RangeQuery(name, gte = asRangeParam(value))
 
-      case EsLessThanOrEqual(EsField(name), EsLiteral(value)) => RangeQueryDefinition(name, lte = asRangeParam(value))
-      case EsLessThanOrEqual(EsLiteral(value), EsField(name)) => RangeQueryDefinition(name, gt = asRangeParam(value))
+      case EsLessThanOrEqual(EsField(name), EsLiteral(value)) => RangeQuery(name, lte = asRangeParam(value))
+      case EsLessThanOrEqual(EsLiteral(value), EsField(name)) => RangeQuery(name, gt = asRangeParam(value))
 
-      case EsNot(operand) => BoolQueryDefinition(not = Seq(operand).map(nodeToQueryDef))
-      case EsAnd(left, right) => BoolQueryDefinition(must = Seq(left, right).map(nodeToQueryDef))
-      case EsOr(left, right) => BoolQueryDefinition(should = Seq(left, right).map(nodeToQueryDef))
+      case EsNot(operand) => BoolQuery(not = Seq(operand).map(nodeToQueryDef))
+      case EsAnd(left, right) => BoolQuery(must = Seq(left, right).map(nodeToQueryDef))
+      case EsOr(left, right) => BoolQuery(should = Seq(left, right).map(nodeToQueryDef))
 
-      case EsStartsWith(EsField(haystack), EsLiteral(prefix)) => PrefixQueryDefinition(haystack, prefix)
+      case EsStartsWith(EsField(haystack), EsLiteral(prefix)) => PrefixQuery(haystack, prefix)
 
       // Use wildcard queries to implement contains() and endswith().
       // Expect these to be much slower than startswith().
       // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-wildcard-query.html
-      case EsContains(EsField(haystack), EsLiteral(needle: String)) => WildcardQueryDefinition(
+      case EsContains(EsField(haystack), EsLiteral(needle: String)) => WildcardQuery(
         haystack,
         s"*${escapeLuceneWildcards(needle)}*"
       )
-      case EsEndsWith(EsField(haystack), EsLiteral(suffix: String)) => WildcardQueryDefinition(
+      case EsEndsWith(EsField(haystack), EsLiteral(suffix: String)) => WildcardQuery(
         haystack,
         s"*${escapeLuceneWildcards(suffix)}"
       )
@@ -108,14 +107,14 @@ object EsExpressionCompiler extends ExpressionVisitor[EsAstNode] {
     s.replaceAll("[*?]", "\\\\$0")
   }
 
-  def compileOrderBy(orderBy: Option[OrderByOption]): Seq[SortDefinition] = {
+  def compileOrderBy(orderBy: Option[OrderByOption]): Seq[Sort] = {
     orderBy
       .map(_.getOrders.asScala)
       .toSeq.flatMap { orders =>
         orders.map { item =>
           compile(item.getExpression) match {
             case EsField(name) =>
-              FieldSortDefinition(
+              FieldSort(
                 name,
                 order = if (item.isDescending) SortOrder.DESC else SortOrder.ASC
               )
@@ -234,11 +233,11 @@ object EsExpressionCompiler extends ExpressionVisitor[EsAstNode] {
     */
   def compileSearch(
     search: Option[SearchOption]
-  ): Option[QueryDefinition] = {
+  ): Option[Query] = {
     search
       .map(_.getSearchExpression)
       .map(translateSearchExpression)
-      .map(QueryStringQueryDefinition(_))
+      .map(QueryStringQuery(_))
   }
 
   /**

@@ -18,6 +18,7 @@ package com.thumbtack.becquerel
 
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
+import scala.collection.JavaConversions._
 
 import org.apache.olingo.commons.api.data.{ContextURL, EntityCollection}
 import org.apache.olingo.commons.api.edm.EdmEntitySet
@@ -52,6 +53,14 @@ class BecquerelServiceEntityCollectionProcessor(
   override def init(odata: OData, serviceMetadata: ServiceMetadata): Unit = {
     this.odata = odata
     this.serviceMetadata = serviceMetadata
+
+    val schema = serviceMetadata.getEdm().getSchemas().head
+    logger.info(s"schema: nameSpace=${schema.getNamespace()} alias=${schema.getAlias()}")
+    val entityContainer = schema.getEntityContainer()
+    entityContainer.getEntitySets.foreach { entitySet =>
+      logger.info(s"entitySet.name=${entitySet.getName()} entitySet.mapping=${entitySet.getMapping()}")
+    }
+
     defaultProcessor.init(odata, serviceMetadata)
   }
 
@@ -67,6 +76,7 @@ class BecquerelServiceEntityCollectionProcessor(
     responseFormat: ContentType
   ): Unit = {
 
+    logger.info(s"BecquerelServiceEntityCollectionProcessor:readEntityCollection uriInfo=$uriInfo responseFormat=$responseFormat")
     require(odata != null)
     require(serviceMetadata != null)
 
@@ -84,6 +94,8 @@ class BecquerelServiceEntityCollectionProcessor(
 
     val baseURI = new URI(request.getRawRequestUri)
 
+    logger.info(s"Invoking odataTry(query): entitySet=$entitySet")
+
     val entityCollection = odataTry("query") {
       Await.result(
         service.query(
@@ -100,6 +112,8 @@ class BecquerelServiceEntityCollectionProcessor(
         service.queryTimeout
       )
     }
+
+    logger.info(s"Invoking odataTry(serialize): entityCollection=$entityCollection")
 
     odataTry("serialize") {
       serialize(

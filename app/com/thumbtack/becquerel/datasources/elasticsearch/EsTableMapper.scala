@@ -17,7 +17,7 @@
 package com.thumbtack.becquerel.datasources.elasticsearch
 
 import com.sksamuel.elastic4s.Hit
-import com.sksamuel.elastic4s.http.index.mappings.IndexMappings
+import com.sksamuel.elastic4s.requests.indexes.IndexMappings
 import com.thumbtack.becquerel.datasources.{ODataStrings, TableMapper}
 import org.apache.olingo.commons.api.edm.FullQualifiedName
 import org.apache.olingo.commons.api.edm.provider.{CsdlEntitySet, CsdlEntityType, CsdlPropertyRef}
@@ -33,9 +33,10 @@ object EsTableMapper {
 
     val indexName = indexMappings.index
 
-    // We expect there to be only one mapping per index.
-    assert(indexMappings.mappings.size == 1)
-    val (mappingName, mapping) = indexMappings.mappings.head
+    // Extract the physical index name from the index mappings and remove the key from the map.
+    // This was inserted by EsService.fetchDefinitions() for this purpose.
+    val mappingName = indexMappings.mappings.getOrElse("real_index", indexName).asInstanceOf[String]
+    val mapping = indexMappings.mappings - "real_index"
 
     val tableIDParts = Seq(indexName, mappingName)
 

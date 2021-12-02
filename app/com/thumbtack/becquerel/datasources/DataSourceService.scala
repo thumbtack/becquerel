@@ -20,6 +20,7 @@ import java.net.URI
 import java.time.{Clock, Instant}
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
+import scala.collection.JavaConversions._
 
 import akka.actor.Cancellable
 import com.codahale.metrics.{Meter, MetricRegistry, Timer}
@@ -135,7 +136,7 @@ trait DataSourceService[Column, Row, Schema, Query] extends BecquerelService {
     * Periodically called by `refresher` to update metadata.
     */
   def refresh(): Unit = {
-    logger.info(s"Starting metadata refresh for $displayName.")
+    logger.info(s"Starting metadata refresh for $name.")
     try {
       val definitions = refreshTimer.timed {
         Await.result(
@@ -144,11 +145,12 @@ trait DataSourceService[Column, Row, Schema, Query] extends BecquerelService {
         )
       }
       val metadata = parseDefinitions(definitions, clock.instant())
+
       metadataRef.lazySet(metadata)
       metadataPromise.trySuccess(metadata)
-      logger.info(s"Updated metadata for $displayName.")
+      logger.info(s"Updated metadata for $name.")
     } catch {
-      case NonFatal(e) => logger.error(s"Failed to update metadata for $displayName", e)
+      case NonFatal(e) => logger.error(s"Failed to update metadata for $name", e)
     }
   }
 
@@ -206,8 +208,6 @@ trait DataSourceService[Column, Row, Schema, Query] extends BecquerelService {
       top,
       skip
     )
-
-    logger.debug(s"compiledQuery:\n$compiledQuery")
 
     errorsMeter.countFutureErrors {
       queryTimer.timeFuture {

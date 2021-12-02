@@ -23,10 +23,11 @@ import java.nio.file.Files
 import scala.collection.JavaConverters._
 
 import com.sksamuel.elastic4s.IndexAndType
-import com.sksamuel.elastic4s.http.ElasticDsl._
-import com.sksamuel.elastic4s.http.HttpClient
-import com.sksamuel.elastic4s.indexes.IndexDefinition
-import com.sksamuel.elastic4s.mappings.{BasicFieldDefinition, MappingDefinition}
+import com.sksamuel.elastic4s.ElasticDsl._
+import com.sksamuel.elastic4s.{ElasticClient, ElasticProperties, Index, SimpleFieldValue}
+import com.sksamuel.elastic4s.http.JavaClient
+import com.sksamuel.elastic4s.requests.indexes.IndexRequest
+import com.sksamuel.elastic4s.requests.mappings.MappingDefinition
 import com.typesafe.config.{Config, ConfigFactory}
 import com.univocity.parsers.common.ParsingContext
 import com.univocity.parsers.common.processor.RowProcessor
@@ -40,13 +41,12 @@ import resource._
 object EsDemoLoader {
 
   def main(args: Array[String]): Unit = {
-    for (esHttpClient <- managed(HttpClient(EsDemoConfig.url))) {
+    for (esClient <- managed(ElasticClient(JavaClient(ElasticProperties(EsDemoConfig.url))))) {
       for (esTable <- esTables) {
-
         val indexName = s"${EsDemoConfig.indexPrefix}${esTable.dvdStoreTable.name}"
 
         try {
-          esHttpClient.execute {
+          esClient.execute {
             deleteIndex(indexName)
           }.await
           println(s"Deleted index $indexName.")
@@ -55,7 +55,7 @@ object EsDemoLoader {
             // The index doesn't exist so we don't need to delete it.
         }
 
-        esHttpClient.execute {
+        esClient.execute {
           createIndex(indexName) mappings esTable.mapping
         }.await
         println(s"Created index $indexName.")
@@ -64,7 +64,7 @@ object EsDemoLoader {
           println(s"Copying $csvPath into $indexName.")
 
           val settings = new CsvParserSettings()
-          val rowProcessor = new EsWriterRowProcessor(esTable, indexName, esHttpClient)
+          val rowProcessor = new EsWriterRowProcessor(esTable, indexName, esClient)
           settings.setProcessor(rowProcessor)
 
           val parser = new CsvParser(settings)
@@ -80,109 +80,28 @@ object EsDemoLoader {
   private[demo] val esTables = Seq[EsDvdStoreTable](
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.customers,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "customerid",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "firstname",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "lastname",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "address1",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "address2",
-            `type` = "long",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "city",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "state",
-            `type` = "keyword",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "zip",
-            `type` = "keyword",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "country",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "region",
-            `type` = "short",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "email",
-            `type` = "keyword",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "phone",
-            `type` = "keyword",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "creditcardtype",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "creditcard",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "creditcardexpiration",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "username",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "password",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "age",
-            `type` = "short",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "income",
-            `type` = "integer",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "gender",
-            `type` = "keyword",
-            nullable = Some(true)
-          )
+          intField(name="customerid"),
+          keywordField(name="firstname"),
+          keywordField(name="lastname"),
+          keywordField(name="address1"),
+          keywordField(name="address2"),
+          keywordField(name="city"),
+          keywordField(name="state"),
+          keywordField(name="zip"),
+          keywordField(name="country"),
+          keywordField(name="region"),
+          keywordField(name="email"),
+          keywordField(name="phone"),
+          keywordField(name="creditcardtype"),
+          keywordField(name="creditcard"),
+          keywordField(name="creditcardexpiration"),
+          keywordField(name="username"),
+          keywordField(name="password"),
+          shortField(name="age"),
+          intField(name="income"),
+          keywordField(name="gender")
         )
       ),
       parseRow = {
@@ -208,71 +127,61 @@ object EsDemoLoader {
           income,
           gender
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
-            id = Some(customerid.toInt)
-          ).fields(
-            "customerid" -> customerid.toInt,
-            "firstname" -> firstname,
-            "lastname" -> lastname,
-            "address1" -> address1,
-            "address2" -> address2,
-            "city" -> city,
-            "state" -> state,
-            "zip" -> zip,
-            "country" -> country,
-            "region" -> region.toShort,
-            "email" -> email,
-            "phone" -> phone,
-            "creditcardtype" -> creditcardtype.toInt,
-            "creditcard" -> creditcard,
-            "creditcardexpiration" -> creditcardexpiration,
-            "username" -> username,
-            "password" -> password,
-            "age" -> Option(age).map(_.toInt).orNull,
-            "income" -> Option(income).map(_.toInt).orNull,
-            "gender" -> gender
+          IndexRequest(
+            index = Index(DvdStoreTable.customers.name),
+            id = Some(customerid),
+            fields = Seq(
+              SimpleFieldValue("customerid", customerid.toInt),
+              SimpleFieldValue("firstname", firstname),
+              SimpleFieldValue("lastname", lastname),
+              SimpleFieldValue("address1", address1),
+              SimpleFieldValue("address2", address2),
+              SimpleFieldValue("city", city),
+              SimpleFieldValue("state", state),
+              SimpleFieldValue("zip", zip),
+              SimpleFieldValue("country", country),
+              SimpleFieldValue("region", region.toShort),
+              SimpleFieldValue("email", email),
+              SimpleFieldValue("phone", phone),
+              SimpleFieldValue("creditcardtype", creditcardtype.toInt),
+              SimpleFieldValue("creditcard", creditcard),
+              SimpleFieldValue("creditcardexpiration", creditcardexpiration),
+              SimpleFieldValue("username", username),
+              SimpleFieldValue("password", password),
+              SimpleFieldValue("age", Option(age).map(_.toInt)),
+              SimpleFieldValue("income", Option(income).map(_.toInt)),
+              SimpleFieldValue("gender", gender)
+            )
           )
       }
     ),
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.cust_hist,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "customerid",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "orderid",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "prod_id",
-            `type` = "integer",
-            nullable = Some(false)
-          )
+          intField(name = "customerid"),
+          intField(name = "orderid"),
+          intField(name = "prod_id")
         )
       ),
       parseRow = {
         case Array(
-        customerid,
-        orderid,
-        prod_id
+          customerid,
+          orderid,
+          prod_id
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
-            id = None
-          ).fields(
-            "customerid" -> customerid.toInt,
-            "orderid" -> orderid.toInt,
-            "prod_id" -> prod_id.toInt
+          IndexRequest(
+            index = Index(DvdStoreTable.cust_hist.name),
+            id = None,
+            fields =Seq(
+              SimpleFieldValue("customerid", customerid.toInt),
+              SimpleFieldValue("orderid", orderid.toInt),
+              SimpleFieldValue("prod_id", prod_id.toInt)
+            )
           )
       }
-    ),
+    )
+      /*
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.orders,
       mapping = MappingDefinition(
@@ -323,8 +232,8 @@ object EsDemoLoader {
         tax,
         totalamount
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
+          IndexRequest(
+//            indexAndType = stubIndexAndType,
             id = Some(orderid.toInt)
           ).fields(
             "orderid" -> orderid.toInt,
@@ -377,8 +286,8 @@ object EsDemoLoader {
         quantity,
         orderdate
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
+          IndexRequest(
+//            indexAndType = stubIndexAndType,
             id = None
           ).fields(
             "orderlineid" -> orderlineid.toShort,
@@ -442,8 +351,8 @@ object EsDemoLoader {
         special,
         common_prod_id
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
+          IndexRequest(
+//            indexAndType = stubIndexAndType,
             id = Some(prod_id.toInt)
           ).fields(
             "prod_id" -> prod_id.toInt,
@@ -484,8 +393,8 @@ object EsDemoLoader {
         quan_in_stock,
         sales
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
+          IndexRequest(
+//            indexAndType = stubIndexAndType,
             id = Some(prod_id.toInt)
           ).fields(
             "prod_id" -> prod_id.toInt,
@@ -516,8 +425,8 @@ object EsDemoLoader {
         category,
         categoryname
         ) =>
-          IndexDefinition(
-            indexAndType = stubIndexAndType,
+          IndexRequest(
+//            indexAndType = stubIndexAndType,
             id = Some(category.toInt)
           ).fields(
             "category" -> category.toInt,
@@ -525,6 +434,8 @@ object EsDemoLoader {
           )
       }
     )
+
+       */
   )
 }
 
@@ -535,7 +446,7 @@ object EsDemoConfig {
     ).asJava))
     .getConfig("es")
     .withFallback(ConfigFactory.parseMap(Map(
-      "url" -> "elasticsearch://localhost:9200",
+      "url" -> "http://localhost:9200",
       "indexPrefix" -> ""
     ).asJava))
   lazy val url: String = es.getString("url")
@@ -548,13 +459,16 @@ object EsDemoConfig {
 private[demo] case class EsDvdStoreTable(
   dvdStoreTable: DvdStoreTable,
   mapping: MappingDefinition,
-  parseRow: Array[String] => IndexDefinition
+  parseRow: Array[String] => IndexRequest
 )
 
-private[demo] class EsWriterRowProcessor(esTable: EsDvdStoreTable, indexName: String, esHttpClient: HttpClient) extends RowProcessor {
+private[demo] class EsWriterRowProcessor(
+  esTable: EsDvdStoreTable,
+  indexName: String,
+  esHttpClient: ElasticClient) extends RowProcessor {
 
   private val batchSize = 1000
-  private var batch = Seq.newBuilder[IndexDefinition]
+  private var batch = Seq.newBuilder[IndexRequest]
   private var rows = 0
 
   override def processStarted(context: ParsingContext): Unit = {
@@ -562,7 +476,7 @@ private[demo] class EsWriterRowProcessor(esTable: EsDvdStoreTable, indexName: St
   }
 
   override def rowProcessed(row: Array[String], context: ParsingContext): Unit = {
-    batch += esTable.parseRow(row).copy(indexAndType = IndexAndType(indexName, EsDemoLoader.esDocType))
+    batch += esTable.parseRow(row)
     rows += 1
     if (rows == batchSize) {
       writeBatch()

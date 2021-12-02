@@ -46,7 +46,7 @@ scalaVersion := "2.11.8"
 
 val googleCloudVersion = "0.8.3-beta"
 val olingoVersion = "4.3.0"
-val elastic4sVersion = "5.4.9"
+val elastic4sVersion = "7.1.0"
 val log4jVersion = "2.8.2"
 
 libraryDependencies ++= Seq(
@@ -85,8 +85,8 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % "42.1.1",
 
   // Elasticsearch backend.
-  "com.sksamuel.elastic4s" %% "elastic4s-http" % elastic4sVersion,
-  "com.sksamuel.elastic4s" %% "elastic4s-play-json" % elastic4sVersion,
+  "com.sksamuel.elastic4s" %% "elastic4s-core" % elastic4sVersion,
+  "com.sksamuel.elastic4s" %% "elastic4s-client-esjava" % "7.0.3",
   // elastic4s depends on the official ES client, which uses Log4j 2, which we don't want.
   // Redirect Log4j to SLF.
   "org.apache.logging.log4j" % "log4j-api" % log4jVersion,

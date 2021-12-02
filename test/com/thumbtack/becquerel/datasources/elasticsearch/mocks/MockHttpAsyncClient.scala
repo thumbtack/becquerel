@@ -52,9 +52,14 @@ class MockHttpAsyncClient(succeedAfter: Int) extends CloseableHttpAsyncClient {
         null
       )
     )
+
     responseConsumer.responseReceived(response)
     responseConsumer.responseCompleted(context)
-    callback.completed(response.asInstanceOf[T])
+    if (numRequests > succeedAfter) {
+      callback.completed(response.asInstanceOf[T])
+    } else {
+      callback.failed(new Exception("Mock exception"))
+    }
     null
   }
 }

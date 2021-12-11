@@ -75,7 +75,6 @@ object EsDemoLoader {
   }
 
   private[demo] val esDocType = "row"
-  private[demo] val stubIndexAndType = IndexAndType("", "")
 
   private[demo] val esTables = Seq[EsDvdStoreTable](
     EsDvdStoreTable(

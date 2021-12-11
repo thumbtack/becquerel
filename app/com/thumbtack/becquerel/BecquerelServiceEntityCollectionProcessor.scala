@@ -53,14 +53,6 @@ class BecquerelServiceEntityCollectionProcessor(
   override def init(odata: OData, serviceMetadata: ServiceMetadata): Unit = {
     this.odata = odata
     this.serviceMetadata = serviceMetadata
-
-    val schema = serviceMetadata.getEdm().getSchemas().head
-    logger.debug(s"schema: nameSpace=${schema.getNamespace()} alias=${schema.getAlias()}")
-    val entityContainer = schema.getEntityContainer()
-    entityContainer.getEntitySets.foreach { entitySet =>
-      logger.debug(s"entitySet.name=${entitySet.getName()} entitySet.mapping=${entitySet.getMapping()}")
-    }
-
     defaultProcessor.init(odata, serviceMetadata)
   }
 
@@ -76,7 +68,6 @@ class BecquerelServiceEntityCollectionProcessor(
     responseFormat: ContentType
   ): Unit = {
 
-    logger.debug(s"BecquerelServiceEntityCollectionProcessor:readEntityCollection uriInfo=$uriInfo responseFormat=$responseFormat")
     require(odata != null)
     require(serviceMetadata != null)
 
@@ -94,8 +85,6 @@ class BecquerelServiceEntityCollectionProcessor(
 
     val baseURI = new URI(request.getRawRequestUri)
 
-    logger.debug(s"Invoking odataTry(query): entitySet=$entitySet")
-
     val entityCollection = odataTry("query") {
       Await.result(
         service.query(
@@ -112,8 +101,6 @@ class BecquerelServiceEntityCollectionProcessor(
         service.queryTimeout
       )
     }
-
-    logger.debug(s"Invoking odataTry(serialize): entityCollection=$entityCollection")
 
     odataTry("serialize") {
       serialize(

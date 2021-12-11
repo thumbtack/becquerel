@@ -209,6 +209,8 @@ trait DataSourceService[Column, Row, Schema, Query] extends BecquerelService {
       skip
     )
 
+    logger.debug(s"compiledQuery:\n$compiledQuery")
+
     errorsMeter.countFutureErrors {
       queryTimer.timeFuture {
         execute(compiledQuery).map { rows =>

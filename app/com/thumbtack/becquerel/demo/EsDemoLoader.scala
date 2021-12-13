@@ -22,7 +22,6 @@ import java.nio.file.Files
 
 import scala.collection.JavaConverters._
 
-import com.sksamuel.elastic4s.IndexAndType
 import com.sksamuel.elastic4s.ElasticDsl._
 import com.sksamuel.elastic4s.{ElasticClient, ElasticProperties, Index, SimpleFieldValue}
 import com.sksamuel.elastic4s.http.JavaClient
@@ -82,25 +81,25 @@ object EsDemoLoader {
       mapping = new MappingDefinition(
         fields = Seq(
           intField(name="customerid"),
-          keywordField(name="firstname"),
-          keywordField(name="lastname"),
-          keywordField(name="address1"),
-          keywordField(name="address2"),
-          keywordField(name="city"),
-          keywordField(name="state"),
-          keywordField(name="zip"),
-          keywordField(name="country"),
-          keywordField(name="region"),
-          keywordField(name="email"),
-          keywordField(name="phone"),
-          keywordField(name="creditcardtype"),
-          keywordField(name="creditcard"),
-          keywordField(name="creditcardexpiration"),
-          keywordField(name="username"),
-          keywordField(name="password"),
+          textField(name="firstname"),
+          textField(name="lastname"),
+          textField(name="address1"),
+          textField(name="address2"),
+          textField(name="city"),
+          textField(name="state"),
+          textField(name="zip"),
+          textField(name="country"),
+          textField(name="region"),
+          textField(name="email"),
+          textField(name="phone"),
+          textField(name="creditcardtype"),
+          textField(name="creditcard"),
+          textField(name="creditcardexpiration"),
+          textField(name="username"),
+          textField(name="password"),
           shortField(name="age"),
           intField(name="income"),
-          keywordField(name="gender")
+          textField(name="gender")
         )
       ),
       parseRow = {
@@ -172,269 +171,168 @@ object EsDemoLoader {
           IndexRequest(
             index = Index(DvdStoreTable.cust_hist.name),
             id = None,
-            fields =Seq(
+            fields = Seq(
               SimpleFieldValue("customerid", customerid.toInt),
               SimpleFieldValue("orderid", orderid.toInt),
               SimpleFieldValue("prod_id", prod_id.toInt)
             )
           )
       }
-    )
-      /*
+    ),
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.orders,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "orderid",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "orderdate",
-            `type` = "date",
-            format = Some("strict_date"),
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "customerid",
-            `type` = "integer",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "netamount",
-            `type` = "scaled_float",
-            nullable = Some(false),
-            scalingFactor = Option(100.0)
-          ),
-          BasicFieldDefinition(
-            name = "tax",
-            `type` = "scaled_float",
-            nullable = Some(false),
-            scalingFactor = Option(100.0)
-          ),
-          BasicFieldDefinition(
-            name = "totalamount",
-            `type` = "scaled_float",
-            nullable = Some(false),
-            scalingFactor = Option(100.0)
-          )
+          intField(name = "orderid"),
+          dateField(name = "orderdate"),
+          intField(name = "customerid"),
+          scaledFloatField(name = "netamount"),
+          scaledFloatField(name = "tax"),
+          scaledFloatField(name = "totalamount")
         )
       ),
       parseRow = {
         case Array(
-        orderid,
-        orderdate,
-        customerid,
-        netamount,
-        tax,
-        totalamount
+          orderid,
+          orderdate,
+          customerid,
+          netamount,
+          tax,
+          totalamount
         ) =>
           IndexRequest(
-//            indexAndType = stubIndexAndType,
-            id = Some(orderid.toInt)
-          ).fields(
-            "orderid" -> orderid.toInt,
-            "orderdate" -> java.sql.Date.valueOf(orderdate.replace('/', '-')),
-            "customerid" -> Option(customerid).map(_.toInt).orNull,
-            "netamount" -> BigDecimal.exact(netamount),
-            "tax" -> BigDecimal.exact(tax),
-            "totalamount" -> BigDecimal.exact(totalamount)
+            index = Index(DvdStoreTable.orders.name),
+            id = Some(orderid),
+            fields = Seq(
+              SimpleFieldValue("orderid", orderid.toInt),
+              SimpleFieldValue("orderdate", java.sql.Date.valueOf(orderdate.replace('/', '-'))),
+              SimpleFieldValue("customerid", Option(customerid).map(_.toInt).getOrElse(None)),
+              SimpleFieldValue("netamount", BigDecimal.exact(netamount)),
+              SimpleFieldValue("tax", BigDecimal.exact(tax)),
+              SimpleFieldValue("totalamount", BigDecimal.exact(totalamount))
+            )
           )
       }
     ),
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.orderlines,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "orderlineid",
-            `type` = "short",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "orderid",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "prod_id",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "quantity",
-            `type` = "short",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "orderdate",
-            `type` = "date",
-            format = Some("strict_date"),
-            nullable = Some(false)
-          )
+          shortField(name = "orderlineid"),
+          intField(name = "orderid"),
+          intField(name = "prod_id"),
+          shortField(name = "quantity"),
+          dateField(name = "orderdate")
         )
       ),
       parseRow = {
         case Array(
-        orderlineid,
-        orderid,
-        prod_id,
-        quantity,
-        orderdate
+          orderlineid,
+          orderid,
+          prod_id,
+          quantity,
+          orderdate
         ) =>
           IndexRequest(
-//            indexAndType = stubIndexAndType,
-            id = None
-          ).fields(
-            "orderlineid" -> orderlineid.toShort,
-            "orderid" -> orderid.toInt,
-            "prod_id" -> prod_id.toInt,
-            "quantity" -> quantity.toShort,
-            "orderdate" -> java.sql.Date.valueOf(orderdate.replace('/', '-'))
+            index = Index(DvdStoreTable.orderlines.name),
+            id = None,
+            fields = Seq(
+              SimpleFieldValue("orderlineid", orderlineid.toShort),
+              SimpleFieldValue("orderid", orderid.toInt),
+              SimpleFieldValue("prod_id", prod_id.toInt),
+              SimpleFieldValue("quantity", quantity.toShort),
+              SimpleFieldValue("orderdate", java.sql.Date.valueOf(orderdate.replace('/', '-')))
+            )
           )
       }
     ),
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.products,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "prod_id",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "category",
-            `type` = "short",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "title",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "actor",
-            `type` = "keyword",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "price",
-            `type` = "scaled_float",
-            nullable = Some(false),
-            scalingFactor = Option(100.0)
-          ),
-          BasicFieldDefinition(
-            name = "special",
-            `type` = "short",
-            nullable = Some(true)
-          ),
-          BasicFieldDefinition(
-            name = "common_prod_id",
-            `type` = "integer",
-            nullable = Some(false)
-          )
+          intField(name = "prod_id"),
+          shortField(name = "category"),
+          keywordField(name = "title"),
+          keywordField(name = "actor"),
+          scaledFloatField(name = "price").scalingFactor(100.0),
+          shortField(name = "special").nullable(true),
+          intField(name = "common_prod_id")
         )
       ),
       parseRow = {
         case Array(
-        prod_id,
-        category,
-        title,
-        actor,
-        price,
-        special,
-        common_prod_id
+          prod_id,
+          category,
+          title,
+          actor,
+          price,
+          special,
+          common_prod_id
         ) =>
           IndexRequest(
-//            indexAndType = stubIndexAndType,
-            id = Some(prod_id.toInt)
-          ).fields(
-            "prod_id" -> prod_id.toInt,
-            "category" -> category.toShort,
-            "title" -> title,
-            "actor" -> actor,
-            "price" -> BigDecimal.exact(price),
-            "special" -> Option(special).map(_.toShort).orNull,
-            "common_prod_id" -> common_prod_id.toInt
+            index = Index(DvdStoreTable.products.name),
+            id = Some(prod_id),
+            fields = Seq(
+              SimpleFieldValue("prod_id", prod_id.toInt),
+              SimpleFieldValue("category", category.toShort),
+              SimpleFieldValue("title", title),
+              SimpleFieldValue("actor", actor),
+              SimpleFieldValue("price", BigDecimal.exact(price)),
+              SimpleFieldValue("special", Option(special).map(_.toShort).getOrElse(None)),
+              SimpleFieldValue("common_prod_id", common_prod_id.toInt)
+            )
           )
       }
     ),
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.inventory,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "prod_id",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "quan_in_stock",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "sales",
-            `type` = "integer",
-            nullable = Some(false)
-          )
+          intField(name = "prod_id"),
+          intField(name = "quan_in_stock"),
+          intField(name = "sales")
         )
       ),
       parseRow = {
         case Array(
-        prod_id,
-        quan_in_stock,
-        sales
+          prod_id,
+          quan_in_stock,
+          sales
         ) =>
           IndexRequest(
-//            indexAndType = stubIndexAndType,
-            id = Some(prod_id.toInt)
-          ).fields(
-            "prod_id" -> prod_id.toInt,
-            "quan_in_stock" -> quan_in_stock.toInt,
-            "sales" -> sales.toInt
+            index = Index(DvdStoreTable.inventory.name),
+            id = Some(prod_id),
+            fields = Seq(
+              SimpleFieldValue("prod_id", prod_id.toInt),
+              SimpleFieldValue("quan_in_stock", quan_in_stock.toInt),
+              SimpleFieldValue("sales", sales.toInt)
+            )
           )
       }
     ),
     EsDvdStoreTable(
       dvdStoreTable = DvdStoreTable.categories,
-      mapping = MappingDefinition(
-        `type` = esDocType,
+      mapping = new MappingDefinition(
         fields = Seq(
-          BasicFieldDefinition(
-            name = "category",
-            `type` = "integer",
-            nullable = Some(false)
-          ),
-          BasicFieldDefinition(
-            name = "categoryname",
-            `type` = "keyword",
-            nullable = Some(false)
-          )
+          intField(name = "category"),
+          keywordField(name = "categoryname")
         )
       ),
       parseRow = {
         case Array(
-        category,
-        categoryname
+          category,
+          categoryname
         ) =>
           IndexRequest(
-//            indexAndType = stubIndexAndType,
-            id = Some(category.toInt)
-          ).fields(
-            "category" -> category.toInt,
-            "categoryname" -> categoryname
+            index = Index(DvdStoreTable.categories.name),
+            id = Some(category),
+            fields = Seq(
+              SimpleFieldValue("category", category.toInt),
+              SimpleFieldValue("categoryname", categoryname)
+            )
           )
       }
     )
-
-       */
   )
 }
 

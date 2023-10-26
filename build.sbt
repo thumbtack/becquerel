@@ -70,7 +70,9 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "util-core" % "6.42.0",
   // Play filter for DropWizard metrics library.
   // This is the forked version from https://github.com/breadfan/metrics-play that supports Play 2.5.
-  "de.threedimensions" %% "metrics-play" % "2.5.13",
+  // 2023-10-26: This library was moved to com.kenshoo
+  // (https://mvnrepository.com/artifact/de.threedimensions/metrics-play)
+  "com.kenshoo" %% "metrics-play" % "2.5.9_0.5.1",
   // Report DropWizard metrics to InfluxDB.
   "com.izettle" % "dropwizard-metrics-influxdb" % "1.1.8" excludeAll(
     ExclusionRule("com.fasterxml.jackson.core", "jackson-core"),

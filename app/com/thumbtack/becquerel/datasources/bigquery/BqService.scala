@@ -26,6 +26,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.control.NonFatal
+import play.api.Logger
 
 import com.google.auth.Credentials
 import com.google.auth.oauth2.{ServiceAccountCredentials, ServiceAccountJwtAccessCredentials, UserCredentials}
@@ -296,9 +297,17 @@ class BqServiceFactory @Inject() (
 ) extends BecquerelServiceFactory {
 
   factoryRegistry(classOf[BqService].getName) = this
+  private def logger: Logger = Logger(getClass)
 
   override def apply(conf: Configuration, serviceManager: BecquerelServiceManager): BqService = {
-    new BqService(bqConfigFactory(conf))
+    try {
+      val service = new BqService(bqConfigFactory(conf))
+      logger.info(s"Created BqService $service")
+      service
+    } catch  {
+      case e: Exception => logger.error(s"Caught exception: $e")
+        throw e
+    }
   }
 }
 

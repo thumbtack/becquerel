@@ -16,12 +16,13 @@
 
 package com.thumbtack.becquerel.datasources.elasticsearch
 
-import com.sksamuel.elastic4s.searches.SearchDefinition
-import com.sksamuel.elastic4s.searches.queries.{BoolQueryDefinition, QueryDefinition}
-import com.sksamuel.elastic4s.{Hit, IndexesAndTypes}
+import com.sksamuel.elastic4s.requests.common.FetchSourceContext
+import com.sksamuel.elastic4s.requests.searches.SearchRequest
+import com.sksamuel.elastic4s.requests.searches.queries.{BoolQuery, Query}
+import com.sksamuel.elastic4s.{Hit, Indexes}
 import com.thumbtack.becquerel.datasources.{RowMapper, TableMapper}
 import org.apache.olingo.server.api.uri.queryoption._
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
+
 
 object EsQueryCompiler {
   /**
@@ -35,29 +36,29 @@ object EsQueryCompiler {
     orderBy: Option[OrderByOption],
     top: Option[TopOption],
     skip: Option[SkipOption]
-  ): (RowMapper[AnyRef, Hit], SearchDefinition) = {
+  ): (RowMapper[AnyRef, Hit], SearchRequest) = {
 
     val (rowMapper: RowMapper[AnyRef, Hit], fetchContext: Option[FetchSourceContext]) = EsSelectCompiler
       .compile(tableMapper, select)
 
-    val indexesAndTypes: IndexesAndTypes = tableMapper.tableIDParts match {
-      case Seq(index, mapping) => IndexesAndTypes(index, mapping)
+    val indexes: Indexes = tableMapper.tableIDParts match {
+      case Seq(index, _) => Indexes(Seq(index))
     }
 
-    val filterQuery: Option[QueryDefinition] = EsExpressionCompiler.compileFilter(filter)
-    val searchQuery: Option[QueryDefinition] = EsExpressionCompiler.compileSearch(search)
-    val query: Option[QueryDefinition] = Seq(
+    val filterQuery: Option[Query] = EsExpressionCompiler.compileFilter(filter)
+    val searchQuery: Option[Query] = EsExpressionCompiler.compileSearch(search)
+    val query: Option[Query] = Seq(
       filterQuery,
       searchQuery
     )
       .flatten match {
       case Seq() => None
       case Seq(single) => Some(single)
-      case many => Some(BoolQueryDefinition(must = many))
+      case many => Some(BoolQuery(must = many))
     }
 
-    val searchDefinition = SearchDefinition(
-      indexesTypes = indexesAndTypes,
+    val searchRequest = SearchRequest(
+      indexes = indexes,
       query = query,
       sorts = EsExpressionCompiler.compileOrderBy(orderBy),
       fetchContext = fetchContext,
@@ -65,6 +66,6 @@ object EsQueryCompiler {
       size = top.map(_.getValue)
     )
 
-    (rowMapper, searchDefinition)
+    (rowMapper, searchRequest)
   }
 }

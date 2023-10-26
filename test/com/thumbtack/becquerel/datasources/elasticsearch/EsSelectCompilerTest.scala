@@ -19,14 +19,15 @@ package com.thumbtack.becquerel.datasources.elasticsearch
 import java.time.Instant
 
 import com.sksamuel.elastic4s.Hit
-import com.sksamuel.elastic4s.http.index.mappings.IndexMappings
+import com.sksamuel.elastic4s.requests.common.FetchSourceContext
+import com.sksamuel.elastic4s.requests.indexes.IndexMappings
 import com.thumbtack.becquerel.datasources.{DataSourceMetadata, TableMapper}
 import org.apache.olingo.commons.api.edm.{Edm, EdmEntityType}
 import org.apache.olingo.commons.api.edmx.EdmxReference
 import org.apache.olingo.server.api.OData
 import org.apache.olingo.server.core.uri.parser.UriTokenizer.TokenKind
 import org.apache.olingo.server.core.uri.parser.{SelectParser, UriTokenizer}
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
+
 import org.scalatest.FunSuite
 
 import scala.collection.JavaConverters._
@@ -38,17 +39,9 @@ class EsSelectCompilerTest extends FunSuite {
   val indexMappings: IndexMappings = IndexMappings(
     index = "test__customers",
     mappings = Map(
-      "row" -> Map(
-        "id" -> Map(
-          "type" -> "long"
-        ),
-        "first_name" -> Map(
-          "type" -> "keyword"
-        ),
-        "last_name" -> Map(
-          "type" -> "keyword"
-        )
-      )
+      "id" -> Map("type" -> "long"),
+      "first_name" -> Map("type" -> "keyword"),
+      "last_name" -> Map("type" -> "keyword")
     )
   )
 
@@ -87,8 +80,8 @@ class EsSelectCompilerTest extends FunSuite {
       selectText = "id",
       expectedFetchContext = Some(new FetchSourceContext(
         true,
-        Array("id"),
-        Array()
+        Set("id"),
+        Set()
       ))
     )
   }
@@ -98,8 +91,8 @@ class EsSelectCompilerTest extends FunSuite {
       selectText = "first_name",
       expectedFetchContext = Some(new FetchSourceContext(
         true,
-        Array("first_name"),
-        Array()
+        Set("first_name"),
+        Set()
       ))
     )
   }
@@ -109,8 +102,8 @@ class EsSelectCompilerTest extends FunSuite {
       selectText = "id,first_name",
       expectedFetchContext = Some(new FetchSourceContext(
         true,
-        Array("id", "first_name"),
-        Array()
+        Set("id", "first_name"),
+        Set()
       ))
     )
   }

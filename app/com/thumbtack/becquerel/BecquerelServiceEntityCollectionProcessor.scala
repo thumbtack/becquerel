@@ -18,6 +18,7 @@ package com.thumbtack.becquerel
 
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
+import scala.collection.JavaConversions._
 
 import org.apache.olingo.commons.api.data.{ContextURL, EntityCollection}
 import org.apache.olingo.commons.api.edm.EdmEntitySet

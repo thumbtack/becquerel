@@ -21,16 +21,14 @@ package com.thumbtack.becquerel.datasources.elasticsearch
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-
-import com.sksamuel.elastic4s.http.ElasticDsl._
-import com.sksamuel.elastic4s.http.HttpClient
+import com.sksamuel.elastic4s.ElasticDsl._
+import com.sksamuel.elastic4s.ElasticClient
+import com.sksamuel.elastic4s.http.JavaClient
 import org.apache.http.HttpHost
 import org.apache.http.impl.nio.client.{CloseableHttpAsyncClient, HttpAsyncClientBuilder}
 import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback
-import org.elasticsearch.client.{ResponseException, RestClient}
+import org.elasticsearch.client.RestClient
 import org.scalatest.FunSuite
-import play.api.http.Status
-
 import com.thumbtack.becquerel.datasources.elasticsearch.mocks.{MockHttpAsyncClient, MockScheduler}
 
 class EsRetryHttpClientTest extends FunSuite {
@@ -51,7 +49,7 @@ class EsRetryHttpClientTest extends FunSuite {
     }
 
     assert(mockHttpAsyncClient.numRequests === 1)
-    assert(exception.exists(_.isInstanceOf[ResponseException]))
+    assert(exception.isDefined)
   }
 
   test("execute with default retries until giving up") {
@@ -63,7 +61,7 @@ class EsRetryHttpClientTest extends FunSuite {
       initialWait = 1.second,
       maxWait = 8.seconds,
       maxAttempts = 5,
-      statusCodes = Set(Status.TOO_MANY_REQUESTS)
+      statusCodes = Set()
     )
 
     val exception: Option[Throwable] = try {
@@ -81,7 +79,7 @@ class EsRetryHttpClientTest extends FunSuite {
     assert(mockHttpAsyncClient.numRequests === 5)
     assert(mockScheduler.delays.size === 4)
     assert(mockScheduler.delays.sum === 15.seconds)
-    assert(exception.exists(_.isInstanceOf[ResponseException]))
+    assert(exception.isDefined)
   }
 
   test("execute past max wait until giving up") {
@@ -93,7 +91,7 @@ class EsRetryHttpClientTest extends FunSuite {
       initialWait = 1.second,
       maxWait = 8.seconds,
       maxAttempts = 6,
-      statusCodes = Set(Status.TOO_MANY_REQUESTS)
+      statusCodes = Set()
     )
 
     val exception: Option[Throwable] = try {
@@ -111,7 +109,7 @@ class EsRetryHttpClientTest extends FunSuite {
     assert(mockHttpAsyncClient.numRequests === 6)
     assert(mockScheduler.delays.size === 5)
     assert(mockScheduler.delays.sum === 23.seconds)
-    assert(exception.exists(_.isInstanceOf[ResponseException]))
+    assert(exception.isDefined)
   }
 
   test("execute with default retries until success") {
@@ -123,7 +121,7 @@ class EsRetryHttpClientTest extends FunSuite {
       initialWait = 1.second,
       maxWait = 8.seconds,
       maxAttempts = 5,
-      statusCodes = Set(Status.TOO_MANY_REQUESTS)
+      statusCodes = Set()
     )
 
     val exception: Option[Throwable] = try {
@@ -147,8 +145,8 @@ class EsRetryHttpClientTest extends FunSuite {
   /**
     * Create an ES client backed by a mocked HTTP client.
     */
-  def newEsClient(mockHttpAsyncClient: MockHttpAsyncClient): HttpClient = {
-    HttpClient.fromRestClient(
+  def newEsClient(mockHttpAsyncClient: MockHttpAsyncClient): ElasticClient = {
+    ElasticClient(JavaClient.fromRestClient(
       RestClient
         .builder(new HttpHost("elasticsearch.example.com"))
         .setHttpClientConfigCallback(new HttpClientConfigCallback {
@@ -159,7 +157,7 @@ class EsRetryHttpClientTest extends FunSuite {
           }
         })
         .build()
-    )
+    ))
   }
 
   /**

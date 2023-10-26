@@ -20,10 +20,11 @@ import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
-
 import akka.actor.{Cancellable, Scheduler}
-import com.sksamuel.elastic4s.http.{HttpClient, HttpExecutable}
-import org.elasticsearch.client.{ResponseException, RestClient}
+import play.api.Logger
+
+import com.sksamuel.elastic4s.{ElasticClient, Executor, Functor, Handler, Response}
+import org.elasticsearch.client.RestClient
 
 /**
   * Wrap the default elastic4s HTTP client to add retry behavior on rate limiting responses.
@@ -37,18 +38,18 @@ import org.elasticsearch.client.{ResponseException, RestClient}
   * @param ec Execution context for recovery handlers.
   */
 class EsRetryHttpClient(
-  wrapped: HttpClient,
+  wrapped: ElasticClient,
   scheduler: Scheduler,
   initialWait: FiniteDuration,
   maxWait: FiniteDuration,
   maxAttempts: Int,
+  // With elasticsearch 7.1 migration, the statusCodes are not used for determining whether to retry a failed request.
+  // The status code is not readily available, so we retry on any error (see the retry() function).
   statusCodes: Set[Int]
 )(
   implicit ec: ExecutionContext
-) extends HttpClient {
-
-  override def rest: RestClient = wrapped.rest
-
+) {
+  protected def logger: Logger = Logger(getClass)
   /**
     * Keep track of pending retries so we can cancel them on graceful exit with [[close]]
     * (`Scheduler.close` is required to execute all of them if it implements `close` at all).
@@ -57,24 +58,29 @@ class EsRetryHttpClient(
 
   def numPendingTasks: Int = pendingTasks.size // Intentionally not synchronized since it's just a metric.
 
-  override def close(): Unit = {
+  def close(): Unit = {
     pendingTasks.synchronized {
       pendingTasks.foreach(_.cancel())
     }
     wrapped.close()
   }
 
-  override def execute[T, U](request: T)(implicit exec: HttpExecutable[T, U]): Future[U] = {
+  def execute[T, U](request: T)
+                  (implicit
+                   executor: Executor[Future],
+                   functor: Functor[Future],
+                   handler: Handler[T, U],
+                   manifest: Manifest[U]): Future[Response[U]] = {
     safeExecute(request)
       .recoverWith(retry(request, 1))
   }
 
-  /**
-    * Some ES commands actually don't use [[HttpExecutable.RichRestClient.async]],
-    * instead running the command synchronously,
-    * and thus may throw exceptions instead of returning them inside a [[Future]].
-    */
-  protected def safeExecute[T, U](request: T)(implicit exec: HttpExecutable[T, U]): Future[U] = {
+  protected def safeExecute[T, U](request: T)
+                                 (implicit
+                                  executor: Executor[Future],
+                                  functor: Functor[Future],
+                                  handler: Handler[T, U],
+                                  manifest: Manifest[U]): Future[Response[U]] = {
     try {
       wrapped.execute(request)
     } catch {
@@ -89,31 +95,34 @@ class EsRetryHttpClient(
   protected def retry[T, U](
     request: T,
     attempts: Int
-  )(
-    implicit exec: HttpExecutable[T, U]
-  ): PartialFunction[Throwable, Future[U]] = {
+  )(implicit
+    executor: Executor[Future],
+    functor: Functor[Future],
+    handler: Handler[T, U],
+    manifest: Manifest[U]): PartialFunction[Throwable, Future[Response[U]]] = {
 
-    case e: ResponseException
-      if statusCodes.contains(e.getResponse.getStatusLine.getStatusCode)
-        && attempts < maxAttempts =>
+    case re: RuntimeException =>
+      if (attempts < maxAttempts) {
+        val wait: FiniteDuration = (initialWait * Math.pow(2, attempts - 1).toLong).min(maxWait)
 
-      val wait: FiniteDuration = (initialWait * Math.pow(2, attempts - 1).toLong).min(maxWait)
+        logger.warn(s"Retrying rate-limited Elasticsearch request in $wait (attempt $attempts of $maxAttempts)")
 
-      logger.warn(s"Retrying rate-limited Elasticsearch request in $wait (attempt $attempts of $maxAttempts)")
-
-      val promise = Promise[U]()
-      val task: Cancellable = scheduler.scheduleOnce(wait) {
-        promise.completeWith(
-          safeExecute(request)
-            .recoverWith(retry(request, attempts + 1))
-        )
+        val promise = Promise[Response[U]]()
+        val task: Cancellable = scheduler.scheduleOnce(wait) {
+          promise.completeWith(
+            safeExecute(request)
+              .recoverWith(retry(request, attempts + 1))
+          )
+        }
+        pendingTasks.synchronized {
+          pendingTasks += task
+        }
+        promise.future.onComplete(_ => pendingTasks.synchronized {
+          pendingTasks -= task
+        })
+        promise.future
+      } else {
+        null
       }
-      pendingTasks.synchronized {
-        pendingTasks += task
-      }
-      promise.future.onComplete(_ => pendingTasks.synchronized {
-        pendingTasks -= task
-      })
-      promise.future
   }
 }
